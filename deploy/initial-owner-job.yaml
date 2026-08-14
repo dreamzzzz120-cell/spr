@@ -1,0 +1,32 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: initial-owner-bootstrap
+  labels:
+    purpose: one-time-bootstrap
+spec:
+  template:
+    template:
+      spec:
+        serviceAccountName: spr-426@spr4-c2c65.iam.gserviceaccount.com
+        containers:
+        - image: "us-central1-docker.pkg.dev/spr4-c2c65/cloud-run-source-deploy/spr-server@sha256:f001a0debb644c2c0a0b1bda2f1f7f8a59609e7d261fa931aa9d30f1dd83edbc"
+          command: ["node", "dist/bootstrap-initial-owner.cjs"]
+          env:
+          - name: SPR_INITIAL_OWNER_EMAIL
+            valueFrom:
+              secretKeyRef:
+                name: SPR_INITIAL_OWNER_EMAIL
+          - name: SPR_OWNER_BOOTSTRAP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: SPR_OWNER_BOOTSTRAP_SECRET
+          - name: SPR_OWNER_BOOTSTRAP_SECRET_SHA256
+            valueFrom:
+              secretKeyRef:
+                name: SPR_OWNER_BOOTSTRAP_SECRET_SHA256
+          - name: FIREBASE_SERVICE_ACCOUNT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: FIREBASE_SERVICE_ACCOUNT_KEY
+        restartPolicy: Never

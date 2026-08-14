@@ -1,0 +1,184 @@
+apiVersion: run.cnrm.cloud.google.com/v1beta1
+kind: RunJob
+metadata:
+  name: sprk2-database-migration
+  namespace: default
+spec:
+  # Job identity and metadata
+  location: us-central1
+  template:
+    spec:
+      # Task configuration
+      taskCount: 1
+      template:
+        metadata:
+          labels:
+            app: database-migration
+            component: schema
+            version: "1.0"
+        spec:
+          # Container image and execution
+          containers:
+          - name: migration-runner
+            image: gcr.io/spr4-c2c65/sprk2:latest
+            imagePullPolicy: Always
+            
+            # Execution command
+            command:
+            - node
+            - dist/migrate.cjs
+            
+            # Environment variables
+            # The migration runner supports BOTH connection methods:
+            # METHOD 1: DATABASE_URL (for new deployments or custom setups)
+            # METHOD 2: SQL_HOST, SQL_USER, SQL_PASSWORD, SQL_DB_NAME (legacy, recommended for consistency)
+            env:
+            # Using legacy SQL_* variables for consistency with Cloud Run services
+            # These are injected from Secrets Manager at runtime
+            
+            - name: SQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: SQL_HOST
+                  key: latest
+            
+            - name: SQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: SQL_USER
+                  key: latest
+            
+            - name: SQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: SQL_PASSWORD
+                  key: latest
+            
+            - name: SQL_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: SQL_DB_NAME
+                  key: latest
+            
+            # Migrations directory (baked into the container)
+            - name: MIGRATIONS_DIR
+              value: /app/migrations
+            
+            # Verbose logging for diagnostics
+            - name: VERBOSE
+              value: "true"
+            
+            # Resource constraints
+            resources:
+              limits:
+                memory: 512Mi
+                cpu: 500m
+              requests:
+                memory: 256Mi
+                cpu: 250m
+          
+          # Service account for Cloud SQL access
+          serviceAccountName: sprk2-database-migrator
+          
+          # Restart policy (no automatic retry by Cloud Run)
+          restartPolicy: Never
+          
+          # Timeout for the entire job
+          timeoutSeconds: 1800  # 30 minutes max
+  
+  # Job execution policy
+  retryLimit: 0  # No automatic retries; use manual redeploy on failure
+  
+  # Monitoring and logging
+  labels:
+    managed-by: terraform
+    component: infrastructure
+    purpose: database-maintenance
+
+---
+# Service Account for Cloud SQL access
+# This account must have:
+# - roles/cloudsql.client (connect to Cloud SQL)
+# - roles/secretmanager.secretAccessor (read database secrets)
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMServiceAccount
+metadata:
+  name: sprk2-database-migrator
+  namespace: default
+spec:
+  displayName: "SPR K2 Database Migration Service Account"
+
+---
+# IAM Binding: Allow Cloud Run Jobs to use this service account
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMServiceAccountBinding
+metadata:
+  name: sprk2-database-migrator-cloudsql-access
+spec:
+  serviceAccountRef:
+    name: sprk2-database-migrator
+  role: roles/cloudsql.client
+
+---
+# IAM Binding: Allow access to SQL_HOST secret
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMPolicy
+metadata:
+  name: sprk2-database-migrator-sql-host-access
+spec:
+  resourceRef:
+    apiVersion: secretmanager.cnrm.cloud.google.com/v1beta1
+    kind: SecretManagerSecret
+    name: SQL_HOST
+  bindings:
+  - role: roles/secretmanager.secretAccessor
+    members:
+    - serviceAccount:sprk2-database-migrator@spr4-c2c65.iam.gserviceaccount.com
+
+---
+# IAM Binding: Allow access to SQL_USER secret
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMPolicy
+metadata:
+  name: sprk2-database-migrator-sql-user-access
+spec:
+  resourceRef:
+    apiVersion: secretmanager.cnrm.cloud.google.com/v1beta1
+    kind: SecretManagerSecret
+    name: SQL_USER
+  bindings:
+  - role: roles/secretmanager.secretAccessor
+    members:
+    - serviceAccount:sprk2-database-migrator@spr4-c2c65.iam.gserviceaccount.com
+
+---
+# IAM Binding: Allow access to SQL_PASSWORD secret
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMPolicy
+metadata:
+  name: sprk2-database-migrator-sql-password-access
+spec:
+  resourceRef:
+    apiVersion: secretmanager.cnrm.cloud.google.com/v1beta1
+    kind: SecretManagerSecret
+    name: SQL_PASSWORD
+  bindings:
+  - role: roles/secretmanager.secretAccessor
+    members:
+    - serviceAccount:sprk2-database-migrator@spr4-c2c65.iam.gserviceaccount.com
+
+---
+# IAM Binding: Allow access to SQL_DB_NAME secret
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMPolicy
+metadata:
+  name: sprk2-database-migrator-sql-db-name-access
+spec:
+  resourceRef:
+    apiVersion: secretmanager.cnrm.cloud.google.com/v1beta1
+    kind: SecretManagerSecret
+    name: SQL_DB_NAME
+  bindings:
+  - role: roles/secretmanager.secretAccessor
+    members:
+    - serviceAccount:sprk2-database-migrator@spr4-c2c65.iam.gserviceaccount.com

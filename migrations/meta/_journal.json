@@ -1,0 +1,10 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    { "idx": 0, "version": "7", "when": 1753500000000, "tag": "0001_immutable_trust_observations", "breakpoints": true },
+    { "idx": 1, "version": "7", "when": 1753600000000, "tag": "0002_hardened_observation_metadata", "breakpoints": true },
+    { "idx": 2, "version": "7", "when": 1753700000000, "tag": "0003_continuous_monitoring", "breakpoints": true },
+    { "idx": 3, "version": "7", "when": 1754438400000, "tag": "0004_add_evidence_items_status", "breakpoints": true }
+  ]
+}

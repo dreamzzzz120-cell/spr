@@ -1,0 +1,10 @@
+{
+  "apiKey": "fake-api-key",
+  "authDomain": "localhost",
+  "projectId": "fake-project",
+  "storageBucket": "fake-bucket",
+  "messagingSenderId": "1234567890",
+  "appId": "1:1234567890:web:abcdef123456",
+  "measurementId": "G-ABCDEFG123",
+  "oAuthClientId": "1234567890-abcdefg.apps.googleusercontent.com"
+}

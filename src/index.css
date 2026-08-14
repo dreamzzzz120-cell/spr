@@ -1,0 +1,213 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Plus Jakarta Sans", sans-serif;
+
+  --color-white: var(--bg-secondary);
+  --color-slate-50: var(--bg-primary);
+  --color-slate-100: var(--bg-tertiary);
+  --color-slate-200: var(--border-color);
+  --color-slate-300: var(--border-input);
+  --color-slate-400: var(--text-secondary);
+  --color-slate-500: var(--text-secondary);
+  --color-slate-600: var(--text-secondary);
+  --color-slate-700: var(--text-primary);
+  --color-slate-800: var(--border-color);
+  --color-slate-900: var(--text-primary);
+  
+  --color-zinc-50: var(--text-primary);
+  --color-zinc-100: var(--text-primary);
+  --color-zinc-200: var(--text-primary);
+  --color-zinc-300: var(--text-secondary);
+  --color-zinc-400: var(--text-secondary);
+  --color-zinc-500: var(--text-secondary);
+  --color-zinc-600: var(--text-secondary);
+  --color-zinc-700: var(--text-primary);
+  --color-zinc-800: var(--border-color);
+  --color-zinc-900: var(--bg-secondary);
+  --color-zinc-950: var(--bg-primary);
+}
+
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --border-input: rgba(15, 23, 42, 0.12);
+  --card-bg: #ffffff;
+  --card-hover-border: rgba(79, 70, 229, 0.25);
+  --card-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 4px 16px -2px rgba(15, 23, 42, 0.05);
+  --card-hover-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(79, 70, 229, 0.06);
+  --input-bg: #f8fafc;
+}
+
+.dark {
+  --bg-primary: #070a12; /* Deep midnight slate infrastructure canvas */
+  --bg-secondary: #0d1322; /* Elevated dark surface */
+  --bg-tertiary: #141c2e; /* Subtle element highlights */
+  --text-primary: #f8fafc; /* Bright crisp primary text */
+  --text-secondary: #94a3b8; /* Slate secondary text for high legibility */
+  --border-color: rgba(255, 255, 255, 0.08); /* Crisp defined hairline borders */
+  --border-input: rgba(99, 102, 241, 0.22);
+  --card-bg: #0d1322;
+  --card-hover-border: rgba(99, 102, 241, 0.5);
+  --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --card-hover-shadow: 0 16px 36px rgba(0, 0, 0, 0.7), 0 4px 16px rgba(99, 102, 241, 0.15);
+  --input-bg: #111827;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* SPR Category-Defining Global Trust Infrastructure Design System */
+.spr-card, .studio-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem; /* rounded-2xl */
+  box-shadow: var(--card-shadow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.spr-card:hover, .studio-card:hover {
+  border-color: var(--card-hover-border);
+  box-shadow: var(--card-hover-shadow);
+}
+
+.spr-input, .studio-input {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
+  border-radius: 0.75rem; /* rounded-xl */
+  font-size: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.spr-input:focus, .studio-input:focus {
+  background-color: var(--card-bg);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  outline: none;
+}
+
+.spr-btn-primary, .studio-btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+  color: #ffffff;
+  border-radius: 0.75rem; /* rounded-xl */
+  font-weight: 700;
+  font-size: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.spr-btn-primary:hover, .studio-btn-primary:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #2563eb 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
+}
+
+.spr-btn-secondary, .studio-btn-secondary {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem; /* rounded-xl */
+  font-weight: 600;
+  font-size: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.spr-btn-secondary:hover, .studio-btn-secondary:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-input);
+}
+
+/* SPR Verified Status Badges */
+.spr-badge-verified {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.spr-badge-certified {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.spr-badge-risk {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.studio-dropdown {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem; /* rounded-2xl */
+  box-shadow: var(--card-shadow);
+  animation: studioSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes studioSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Custom scrollbars for high-density enterprise interfaces */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: #070a12;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 2px;
+}
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
