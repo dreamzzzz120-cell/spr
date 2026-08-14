@@ -1,0 +1,22 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.worker"
+
+[deploy]
+startCommand = "node dist/worker.cjs"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Service-specific override for the spr-worker Railway service.
+# The root railway.toml is configured for the spr web service (Dockerfile +
+# node dist/server.cjs); this file makes spr-worker build from
+# Dockerfile.worker and run the worker entrypoint instead, so
+# runWorkerLoop / runMonitoringWorkerLoop (worker.ts) execute rather than
+# the HTTP server.
+#
+# No healthcheckPath is set here because the worker does not expose an
+# HTTP endpoint.
+#
+# This service needs the same DATABASE_URL / FIREBASE_SERVICE_ACCOUNT_KEY /
+# REDIS_URL variables as the web service, copied into its own Variables tab;
+# Railway does not share variables across services by default.
