@@ -34,4 +34,4 @@ COPY --from=builder /app/index.html ./index.html
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["node", "dist/server.cjs"]
+CMD ["sh", "-c", "if [ \"$PROCESS_ROLE\" = \"worker\" ]; then exec node dist/worker.cjs; else exec node dist/server.cjs; fi"]
