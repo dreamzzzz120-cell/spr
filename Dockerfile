@@ -1,4 +1,4 @@
-# Build stage
+﻿# Build stage
 FROM node:20-slim AS builder
 WORKDIR /app
 
@@ -16,6 +16,12 @@ RUN npm prune --production
 # Runtime stage
 FROM node:20-slim AS runtime
 WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y unzip curl ca-certificates && \
+    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin v1.49.0 && \
+    syft version && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
