@@ -16,7 +16,7 @@ const publicRoutes = new Set([
 ]);
 
 const protectedRoutes = routes.filter(route => !publicRoutes.has(`${route.method} ${route.path}`));
-const port = String(3800 + Math.floor(Math.random() * 100));
+const port = String(3900 + (process.pid % 100));
 const child = spawn(process.execPath, ['--import', 'tsx', 'server.ts'], {
   env: { ...process.env, NODE_ENV: 'test', SKIP_DOTENV: 'true', PORT: port },
   stdio: ['ignore', 'pipe', 'pipe'],
