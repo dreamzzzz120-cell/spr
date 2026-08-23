@@ -38,10 +38,12 @@ class InMemoryStore implements RateLimitStore {
   }
 }
 
-interface AtomicRateLimitClient { increment(script: string, key: string, windowMs: number): Promise<unknown>; }
+interface AtomicRateLimitClient { increment(script: string, key: string, windowMs: number, limit?: number): Promise<unknown>; }
 export class IORedisAtomicClient implements AtomicRateLimitClient {
   constructor(private readonly client: { eval(script: string, numKeys: number, ...args: Array<string | number>): Promise<unknown> }) {}
-  increment(script: string, key: string, windowMs: number) { return this.client.eval(script, 1, key, String(windowMs)); }
+  increment(script: string, key: string, windowMs: number, limit = maxRequestsPerWindow) {
+    return this.client.eval(script, 1, key, String(windowMs), String(limit));
+  }
 }
 export function createAtomicRateLimitClient(provider: 'ioredis', client: any): AtomicRateLimitClient {
   if (provider !== 'ioredis' || !client || typeof client.eval !== 'function') throw new Error('Invalid ioredis rate-limit client');
@@ -50,13 +52,24 @@ export function createAtomicRateLimitClient(provider: 'ioredis', client: any): A
 
 export class RedisStore implements RateLimitStore {
   private readonly lua = 'local count = redis.call("INCR", KEYS[1])\nlocal ttl = redis.call("PTTL", KEYS[1])\nif count == 1 or ttl < 0 then redis.call("PEXPIRE", KEYS[1], ARGV[1]); ttl = tonumber(ARGV[1]) end\nreturn {count, ttl}';
-  constructor(private readonly atomicClient: AtomicRateLimitClient) {}
-  async incr(key: string, windowMs: number) {
-    const res = await this.atomicClient.increment(this.lua, key, windowMs);
-    if (!Array.isArray(res) || res.length < 2) throw new Error('Invalid Redis rate-limit response');
-    const count = Number(res[0]); const ttl = Number(res[1]);
-    if (!Number.isFinite(count) || count < 1 || !Number.isFinite(ttl) || ttl <= 0) throw new Error('Invalid Redis rate-limit values');
-    return { count, resetAt: Date.now() + ttl };
+  private readonly fallbackStore: RateLimitStore;
+  private readonly failOpen: boolean;
+  constructor(private readonly atomicClient: AtomicRateLimitClient, _legacyClient?: unknown, failOpen = false) {
+    this.failOpen = failOpen;
+    if (failOpen && config.isProduction) throw new Error('Production rate limiter cannot fail open');
+    this.fallbackStore = new InMemoryStore();
+  }
+  async incr(key: string, windowMs: number, limit: number) {
+    try {
+      const res = await this.atomicClient.increment(this.lua, key, windowMs, limit);
+      if (!Array.isArray(res) || res.length < 2) throw new Error('Invalid Redis rate-limit response');
+      const count = Number(res[0]); const ttl = Number(res[1]);
+      if (!Number.isFinite(count) || count < 1 || !Number.isFinite(ttl) || ttl <= 0) throw new Error('Invalid Redis rate-limit values');
+      return { count, resetAt: Date.now() + ttl };
+    } catch (err) {
+      if (this.failOpen && isTestMode()) return this.fallbackStore.incr(key, windowMs, limit);
+      throw err;
+    }
   }
 }
 
@@ -115,7 +128,6 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     const emailVerified = !!decodedToken.email_verified;
     const exempt = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
     if (!emailVerified && !exempt) return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });
-
     const defaultTenantId = `tenant-${uid}`;
     let dbUser = await db.select().from(users).where(eq(users.uid, uid)).then(rows => rows[0]);
     if (!dbUser) {
@@ -155,22 +167,12 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
 };
 
 const ROLE_NAMES = new Set(['Viewer', 'Technician', 'Admin', 'Owner', 'Auditor']);
-
-/**
- * Role checks are intentionally exact. A route declaring `Owner` must not become
- * accessible to Admin/Technician/Viewer merely because the caller has a lower role.
- * Any hierarchy or delegation must be expressed explicitly by the route's allowlist.
- */
 export const requireRole = (allowedRoles: string[]) => {
-  if (allowedRoles.length === 0 || allowedRoles.some(role => !ROLE_NAMES.has(role))) {
-    throw new Error(`Invalid RBAC allowlist: ${allowedRoles.join(', ')}`);
-  }
+  if (allowedRoles.length === 0 || allowedRoles.some(role => !ROLE_NAMES.has(role))) throw new Error(`Invalid RBAC allowlist: ${allowedRoles.join(', ')}`);
   const effectiveRoles = new Set(allowedRoles);
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Unauthorized: Authentication required' });
-    if (!effectiveRoles.has(req.user.role)) {
-      return res.status(403).json({ error: 'Forbidden: Insufficient privileges', message: `Your role (${req.user.role}) does not have permission to access this resource.` });
-    }
+    if (!effectiveRoles.has(req.user.role)) return res.status(403).json({ error: 'Forbidden: Insufficient privileges', message: `Your role (${req.user.role}) does not have permission to access this resource.` });
     return next();
   };
 };
