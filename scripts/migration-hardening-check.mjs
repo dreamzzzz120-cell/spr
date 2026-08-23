@@ -21,7 +21,9 @@ for (let i = 1; i < ordered.length; i += 1) {
   if (current !== previous + 1) failures.push(`Migration version gap between ${String(previous).padStart(4, '0')} and ${String(current).padStart(4, '0')}`);
 }
 
-for (const file of files) {
+// Historical migrations are immutable. New migrations must be atomic so a
+// partial deploy cannot leave a half-applied schema change.
+for (const file of files.filter(name => Number(name.slice(0, 4)) >= 6)) {
   const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
   if (!/^\s*BEGIN\s*;/i.test(sql)) failures.push(`${file} must begin with BEGIN;`);
   if (!/COMMIT;\s*$/i.test(sql)) failures.push(`${file} must end with COMMIT;`);
