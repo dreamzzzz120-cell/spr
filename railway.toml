@@ -1,6 +1,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+buildCommand = "npm run typecheck && npm test -- --run && npm run security:gate && npm run build"
 
 [deploy]
 startCommand = "node dist/server.cjs"
@@ -9,28 +10,29 @@ healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 
-# Railway auto-injects PORT and, once you add the Postgres plugin, DATABASE_URL —
-# server.ts and src/config.ts already read both, no code changes needed.
+# Production deployment contract:
+# - Node 22 is enforced by Dockerfile/Dockerfile.worker.
+# - Production configuration is fail-closed in src/config.ts.
+# - Shared Redis is mandatory for production rate limiting.
+# - Firebase Admin and Stripe signing secrets are mandatory for the production API.
+# - Migrations must complete successfully before the service starts.
 #
-# Everything else has to be set by hand in the Railway dashboard under this
-# service's Variables tab (Settings -> Variables, or `railway variables set`):
-#
+# Required Railway Variables include:
 #   NODE_ENV=production
-#   APP_URL=https://<your-railway-domain>              (required in production, src/config.ts)
-#   APP_ALLOWED_ORIGINS=https://<your-vercel-domain>    (comma-separated if more than one)
-#   FIREBASE_SERVICE_ACCOUNT_KEY   (paste the full JSON key as one value)
+#   APP_URL=https://<public-domain>
+#   APP_ALLOWED_ORIGINS=https://<allowed-origin>[,https://<additional-origin>]
+#   ENFORCE_HTTPS=true
+#   TRUST_PROXY=true
+#   FIREBASE_SERVICE_ACCOUNT_KEY (or GOOGLE_APPLICATION_CREDENTIALS)
 #   STRIPE_SECRET_KEY
 #   STRIPE_WEBHOOK_SECRET
-#   SENTRY_DSN                     (optional — logs a warning and runs without it if unset)
-#   REDIS_URL                      (Upstash connection string — required for the shared
-#                                    rate limiter; without it the limiter fails closed (503)
-#                                    per-request in production once traffic crosses instances)
-#   GOOGLE_GENAI_API_KEY            (for the /api/ai/* routes)
+#   REDIS_URL
+#   DATABASE_URL (or complete SQL_* alternative)
+#   RATE_LIMIT_FAIL_OPEN=false
 #
-# Migrations run once via Railway CLI, not as part of the boot command:
-#   railway run node dist/migrate.cjs
+# Optional:
+#   GEMINI_API_KEY
+#   SENTRY_DSN
 #
-# The worker is a SEPARATE Railway service pointed at Dockerfile.worker (see
-# RAILWAY_DEPLOY.md) — it needs the same DATABASE_URL / FIREBASE_SERVICE_ACCOUNT_KEY /
-# REDIS_URL variables copied into its own Variables tab; Railway does not share
-# variables across services by default.
+# The worker is a separate Railway service pointed at Dockerfile.worker and must
+# receive the database/Firebase/Redis configuration it actually needs.
