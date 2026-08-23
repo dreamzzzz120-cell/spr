@@ -1,0 +1,9 @@
+# Security-sensitive code requires explicit review from the repository owner.
+* @dreamzzzz120-cell
+src/middleware/security.ts @dreamzzzz120-cell
+src/config.ts @dreamzzzz120-cell
+src/lib/firebase-admin.ts @dreamzzzz120-cell
+server.ts @dreamzzzz120-cell
+migrations/* @dreamzzzz120-cell
+.github/workflows/* @dreamzzzz120-cell
+Dockerfile* @dreamzzzz120-cell
