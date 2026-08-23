@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const configPath = path.resolve(process.cwd(), 'src/config.ts');
-const nodeRunner = `import '${configPath.replaceAll('\\', '/')}';`;
+const nodeRunner = `import { validateConfiguration } from '${configPath.replaceAll('\\', '/')}'; validateConfiguration();`;
 
 function runWith(env: Record<string, string | undefined>) {
   const merged = { ...process.env, ...env, SKIP_DOTENV: 'true' };
