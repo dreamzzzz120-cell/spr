@@ -7,14 +7,7 @@ import { users } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    uid: string;
-    email: string;
-    tenantId: string;
-    role: string;
-    emailVerified: boolean;
-  };
+  user?: { id: number; uid: string; email: string; tenantId: string; role: string; emailVerified: boolean };
 }
 
 let rateLimitWindowMs = 60 * 1000;
@@ -45,41 +38,24 @@ class InMemoryStore implements RateLimitStore {
   }
 }
 
-interface AtomicRateLimitClient {
-  increment(script: string, key: string, windowMs: number): Promise<unknown>;
-}
-
+interface AtomicRateLimitClient { increment(script: string, key: string, windowMs: number): Promise<unknown>; }
 export class IORedisAtomicClient implements AtomicRateLimitClient {
   constructor(private readonly client: { eval(script: string, numKeys: number, ...args: Array<string | number>): Promise<unknown> }) {}
-  increment(script: string, key: string, windowMs: number) {
-    return this.client.eval(script, 1, key, String(windowMs));
-  }
+  increment(script: string, key: string, windowMs: number) { return this.client.eval(script, 1, key, String(windowMs)); }
 }
-
 export function createAtomicRateLimitClient(provider: 'ioredis', client: any): AtomicRateLimitClient {
-  if (provider !== 'ioredis' || !client || typeof client.eval !== 'function') {
-    throw new Error('Invalid ioredis rate-limit client');
-  }
+  if (provider !== 'ioredis' || !client || typeof client.eval !== 'function') throw new Error('Invalid ioredis rate-limit client');
   return new IORedisAtomicClient(client);
 }
 
 export class RedisStore implements RateLimitStore {
-  private readonly lua =
-    'local count = redis.call("INCR", KEYS[1])\n' +
-    'local ttl = redis.call("PTTL", KEYS[1])\n' +
-    'if count == 1 or ttl < 0 then redis.call("PEXPIRE", KEYS[1], ARGV[1]); ttl = tonumber(ARGV[1]) end\n' +
-    'return {count, ttl}';
-
+  private readonly lua = 'local count = redis.call("INCR", KEYS[1])\nlocal ttl = redis.call("PTTL", KEYS[1])\nif count == 1 or ttl < 0 then redis.call("PEXPIRE", KEYS[1], ARGV[1]); ttl = tonumber(ARGV[1]) end\nreturn {count, ttl}';
   constructor(private readonly atomicClient: AtomicRateLimitClient) {}
-
   async incr(key: string, windowMs: number) {
     const res = await this.atomicClient.increment(this.lua, key, windowMs);
     if (!Array.isArray(res) || res.length < 2) throw new Error('Invalid Redis rate-limit response');
-    const count = Number(res[0]);
-    const ttl = Number(res[1]);
-    if (!Number.isFinite(count) || count < 1 || !Number.isFinite(ttl) || ttl <= 0) {
-      throw new Error('Invalid Redis rate-limit values');
-    }
+    const count = Number(res[0]); const ttl = Number(res[1]);
+    if (!Number.isFinite(count) || count < 1 || !Number.isFinite(ttl) || ttl <= 0) throw new Error('Invalid Redis rate-limit values');
     return { count, resetAt: Date.now() + ttl };
   }
 }
@@ -90,24 +66,14 @@ try { IORedis = require('ioredis'); } catch {}
 
 export function createSharedRateLimitStoreFromEnv(): RateLimitStore {
   if (!config.isProduction) return new InMemoryStore();
-
   const redisUrl = config.redis.url;
   if (!redisUrl) throw new Error('REDIS_URL is required in production for security rate limiting');
   if (!IORedis) throw new Error('ioredis is required in production for security rate limiting');
-
-  const client = new IORedis(redisUrl, {
-    lazyConnect: false,
-    enableReadyCheck: true,
-    maxRetriesPerRequest: 1,
-    reconnectOnError: () => true,
-  });
-
+  const client = new IORedis(redisUrl, { lazyConnect: false, enableReadyCheck: true, maxRetriesPerRequest: 1, reconnectOnError: () => true });
   client.on('error', (err: Error) => console.error('[RateLimiter] Redis error:', err.message));
   client.on('end', () => console.error('[RateLimiter] Redis connection ended; requests will fail closed until Redis recovers.'));
-
   return new RedisStore(createAtomicRateLimitClient('ioredis', client));
 }
-
 if (config.isProduction) sharedStore = createSharedRateLimitStoreFromEnv();
 
 export function setRateLimiterStore(s: RateLimitStore) {
@@ -119,7 +85,6 @@ export const rateLimiter = async (req: Request, res: Response, next: NextFunctio
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const tenantId = (req as AuthenticatedRequest).user?.tenantId;
   const key = tenantId ? `rl:tenant:${tenantId}:ip:${ip}` : `rl:ip:${ip}`;
-
   try {
     const counter = await sharedStore.incr(key, rateLimitWindowMs, maxRequestsPerWindow);
     const remaining = Math.max(0, maxRequestsPerWindow - counter.count);
@@ -143,28 +108,22 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7).trim();
   if (!token) return res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization token' });
-
   try {
     const decodedToken: any = await adminAuth.verifyIdToken(token, true);
     const uid = decodedToken.uid;
     const email = decodedToken.email || `${uid}@user.local`;
     const emailVerified = !!decodedToken.email_verified;
-    const isVerificationExemptPath = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
+    const exempt = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
+    if (!emailVerified && !exempt) return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });
 
-    if (!emailVerified && !isVerificationExemptPath) {
-      return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });
-    }
-
-    const domain = email.split('@')[1] || 'generic';
-    const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'icloud.com'];
-    const defaultTenantId = publicDomains.includes(domain.toLowerCase()) ? `tenant-${uid}` : `tenant-${domain}`;
-
+    // Self-registration never derives a shared tenant from an email domain. Domain-based
+    // tenancy is an authorization boundary and must only come from an explicit invitation.
+    const defaultTenantId = `tenant-${uid}`;
     let dbUser = await db.select().from(users).where(eq(users.uid, uid)).then(rows => rows[0]);
     if (!dbUser) {
       dbUser = await db.select().from(users).where(eq(users.email, email)).then(rows => rows[0]);
       if (dbUser) {
-        const previousUid = dbUser.uid;
-        const previousOnboarded = dbUser.onboarded;
+        const previousUid = dbUser.uid; const previousOnboarded = dbUser.onboarded;
         const updated = await db.update(users).set({ uid, onboarded: 1 }).where(eq(users.id, dbUser.id)).returning();
         dbUser = updated[0];
         const claimRes = await setUserCustomClaims(uid, { workspaceId: dbUser.tenantId, role: dbUser.role });
@@ -182,19 +141,12 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
         }
       }
     }
-
-    const claimRole = decodedToken.role;
-    const claimWorkspace = decodedToken.workspaceId || decodedToken.tenantId;
+    const claimRole = decodedToken.role; const claimWorkspace = decodedToken.workspaceId || decodedToken.tenantId;
     if (!claimRole || !claimWorkspace) {
       await setUserCustomClaims(uid, { workspaceId: dbUser.tenantId, role: dbUser.role });
       return res.status(401).json({ error: 'Authentication context refresh required' });
     }
-
-    // Never trust client claims over the database's authoritative tenant/role mapping.
-    if (claimWorkspace !== dbUser.tenantId || claimRole !== dbUser.role) {
-      return res.status(403).json({ error: 'Forbidden: Authentication context does not match account authorization' });
-    }
-
+    if (claimWorkspace !== dbUser.tenantId || claimRole !== dbUser.role) return res.status(403).json({ error: 'Forbidden: Authentication context does not match account authorization' });
     req.user = { id: dbUser.id, uid: dbUser.uid, email: dbUser.email, tenantId: dbUser.tenantId, role: dbUser.role, emailVerified };
     return next();
   } catch (err: any) {
@@ -202,4 +154,26 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     console.error('[Auth] Verification failure request=%s error=%s', requestId, err?.message || err);
     return res.status(401).json({ error: 'Unauthorized: Invalid or expired security token', requestId });
   }
+};
+
+const ROLE_HIERARCHY = ['Viewer', 'Technician', 'Admin', 'Owner'] as const;
+function resolveEffectiveRoles(allowedRoles: string[]): Set<string> {
+  const effective = new Set<string>(allowedRoles);
+  for (const role of allowedRoles) {
+    if (role === 'Auditor') { effective.add('Admin'); effective.add('Owner'); continue; }
+    const rank = ROLE_HIERARCHY.indexOf(role as typeof ROLE_HIERARCHY[number]);
+    if (rank === -1) continue;
+    for (let i = rank + 1; i < ROLE_HIERARCHY.length; i++) effective.add(ROLE_HIERARCHY[i]);
+    if (ROLE_HIERARCHY[rank] === 'Viewer') effective.add('Auditor');
+  }
+  return effective;
+}
+
+export const requireRole = (allowedRoles: string[]) => {
+  const effectiveRoles = resolveEffectiveRoles(allowedRoles);
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized: Authentication required' });
+    if (!effectiveRoles.has(req.user.role)) return res.status(403).json({ error: 'Forbidden: Insufficient privileges', message: `Your role (${req.user.role}) does not have permission to access this resource. Allowed roles: ${allowedRoles.join(', ')}` });
+    return next();
+  };
 };
