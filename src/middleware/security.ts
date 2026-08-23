@@ -107,7 +107,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7).trim();
   if (!token) return res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization token' });
   try {
-    const decodedToken: any = await adminAuth.verifyIdToken(token, true); // catch is intentionally in this failure path; auth must fail closed.
+    const decodedToken: any = await adminAuth.verifyIdToken(token, true); // catch -> res.status(401) below; authentication fails closed.
     const uid = decodedToken.uid; const email = decodedToken.email || `${uid}@user.local`; const emailVerified = !!decodedToken.email_verified;
     const exempt = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
     if (!emailVerified && !exempt) return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });
