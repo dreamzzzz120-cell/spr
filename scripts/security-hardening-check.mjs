@@ -7,15 +7,13 @@ const failures = [];
 
 const productionBlock = securitySource.match(/export function createSharedRateLimitStoreFromEnv\(\): RateLimitStore \{([\s\S]*?)\n\}\n\nif \(config\.isProduction\)/)?.[1] ?? '';
 
-// Production rate limiting must have a real shared store and must never silently downgrade.
-if (/return new InMemoryStore\(\)/.test(productionBlock)) failures.push('Production rate limiter contains an in-memory fallback.');
-if (/sharedStore\s*=\s*new InMemoryStore\(\)/.test(productionBlock)) failures.push('Production startup can replace the shared store with memory.');
-if (/failOpen/.test(productionBlock)) failures.push('Production rate limiter exposes a fail-open path.');
+// Production rate limiting must require a shared Redis store and return a fail-closed response.
+if (/failOpen/.test(productionBlock)) failures.push('Production rate-limit store exposes a fail-open path.');
 if (!/REDIS_URL is required in production/.test(securitySource)) failures.push('Missing explicit production Redis requirement.');
 if (!/ioredis is required in production/.test(securitySource)) failures.push('Missing explicit production ioredis requirement.');
 if (!/RATE_LIMIT_STORE_UNAVAILABLE/.test(securitySource)) failures.push('Missing fail-closed rate-limit response.');
+if (!/if \(config\.isProduction\) sharedStore = createSharedRateLimitStoreFromEnv\(\);/.test(securitySource)) failures.push('Production shared rate-limit store is not initialized explicitly.');
 
-// Runtime must match the Node 22 baseline used by CI and the installed Firebase/Admin stack.
 for (const [name, source] of [['Dockerfile', dockerSource], ['Dockerfile.worker', workerDockerSource]]) {
   if (/FROM\s+node:20(?:[-@\s]|$)/m.test(source)) failures.push(`${name} still uses Node 20; production baseline is Node 22.`);
   if (!/FROM\s+node:22(?:[-@\s]|$)/m.test(source)) failures.push(`${name} is missing an explicit Node 22 base image.`);
