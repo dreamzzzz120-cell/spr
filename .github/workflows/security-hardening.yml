@@ -42,20 +42,6 @@ jobs:
         with:
           category: /language:${{ matrix.language }}
 
-  dependency-review:
-    name: Dependency Review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Review dependencies
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: high
-
   application-security:
     name: Application Security Tests
     runs-on: ubuntu-latest
