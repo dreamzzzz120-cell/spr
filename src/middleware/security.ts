@@ -116,8 +116,6 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
     const exempt = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
     if (!emailVerified && !exempt) return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });
 
-    // Self-registration never derives a shared tenant from an email domain. Domain-based
-    // tenancy is an authorization boundary and must only come from an explicit invitation.
     const defaultTenantId = `tenant-${uid}`;
     let dbUser = await db.select().from(users).where(eq(users.uid, uid)).then(rows => rows[0]);
     if (!dbUser) {
@@ -156,24 +154,23 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   }
 };
 
-const ROLE_HIERARCHY = ['Viewer', 'Technician', 'Admin', 'Owner'] as const;
-function resolveEffectiveRoles(allowedRoles: string[]): Set<string> {
-  const effective = new Set<string>(allowedRoles);
-  for (const role of allowedRoles) {
-    if (role === 'Auditor') { effective.add('Admin'); effective.add('Owner'); continue; }
-    const rank = ROLE_HIERARCHY.indexOf(role as typeof ROLE_HIERARCHY[number]);
-    if (rank === -1) continue;
-    for (let i = rank + 1; i < ROLE_HIERARCHY.length; i++) effective.add(ROLE_HIERARCHY[i]);
-    if (ROLE_HIERARCHY[rank] === 'Viewer') effective.add('Auditor');
-  }
-  return effective;
-}
+const ROLE_NAMES = new Set(['Viewer', 'Technician', 'Admin', 'Owner', 'Auditor']);
 
+/**
+ * Role checks are intentionally exact. A route declaring `Owner` must not become
+ * accessible to Admin/Technician/Viewer merely because the caller has a lower role.
+ * Any hierarchy or delegation must be expressed explicitly by the route's allowlist.
+ */
 export const requireRole = (allowedRoles: string[]) => {
-  const effectiveRoles = resolveEffectiveRoles(allowedRoles);
+  if (allowedRoles.length === 0 || allowedRoles.some(role => !ROLE_NAMES.has(role))) {
+    throw new Error(`Invalid RBAC allowlist: ${allowedRoles.join(', ')}`);
+  }
+  const effectiveRoles = new Set(allowedRoles);
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Unauthorized: Authentication required' });
-    if (!effectiveRoles.has(req.user.role)) return res.status(403).json({ error: 'Forbidden: Insufficient privileges', message: `Your role (${req.user.role}) does not have permission to access this resource. Allowed roles: ${allowedRoles.join(', ')}` });
+    if (!effectiveRoles.has(req.user.role)) {
+      return res.status(403).json({ error: 'Forbidden: Insufficient privileges', message: `Your role (${req.user.role}) does not have permission to access this resource.` });
+    }
     return next();
   };
 };
