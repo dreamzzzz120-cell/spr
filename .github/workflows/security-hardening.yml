@@ -31,15 +31,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
-
       - name: Analyze
         uses: github/codeql-action/analyze@v3
         with:
@@ -54,7 +51,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Review dependencies
         uses: actions/dependency-review-action@v4
         with:
@@ -68,25 +64,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - name: Install locked dependencies
         run: npm ci
-
       - name: Typecheck
         run: npm run typecheck
-
       - name: Tests
         run: npm test -- --run
-
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
-
+      - name: Rate-limit fail-closed regression gate
+        run: node scripts/security-hardening-check.mjs
       - name: Check for committed private-key material
         shell: bash
         run: |
