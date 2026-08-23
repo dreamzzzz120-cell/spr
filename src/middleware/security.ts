@@ -61,8 +61,9 @@ let IORedis: any = null;
 try { IORedis = require('ioredis'); } catch {}
 
 export function createSharedRateLimitStoreFromEnv(): RateLimitStore {
-  if (!config.isProduction) return new InMemoryStore();
-  const redisUrl = config.redis.url;
+  const production = config.isProduction || process.env.NODE_ENV === 'production';
+  if (!production) return new InMemoryStore();
+  const redisUrl = config.redis.url || process.env.REDIS_URL;
   if (!redisUrl) throw new Error('REDIS_URL is required in production for security rate limiting');
   if (!IORedis) throw new Error('ioredis is required in production for security rate limiting');
   const client = new IORedis(redisUrl, { lazyConnect: false, enableReadyCheck: true, maxRetriesPerRequest: 1, reconnectOnError: () => true });
@@ -83,12 +84,13 @@ export const rateLimiter = async (req: Request, res: Response, next: NextFunctio
   const key = tenantId ? `rl:tenant:${tenantId}:ip:${ip}` : `rl:ip:${ip}`;
   try {
     const counter = await sharedStore.incr(key, rateLimitWindowMs, maxRequestsPerWindow);
-    const remaining = Math.max(0, maxRequestsPerWindow - counter.count);
+    if (!counter || !Number.isFinite(Number(counter.count)) || Number(counter.count) < 1 || !Number.isFinite(Number(counter.resetAt)) || Number(counter.resetAt) <= 0) throw new Error('Invalid rate-limit store result');
+    const remaining = Math.max(0, maxRequestsPerWindow - Number(counter.count));
     res.setHeader('X-RateLimit-Limit', String(maxRequestsPerWindow));
     res.setHeader('X-RateLimit-Remaining', String(remaining));
-    res.setHeader('X-RateLimit-Reset', String(Math.ceil(counter.resetAt / 1000)));
-    if (counter.count > maxRequestsPerWindow) {
-      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((counter.resetAt - Date.now()) / 1000))));
+    res.setHeader('X-RateLimit-Reset', String(Math.ceil(Number(counter.resetAt) / 1000)));
+    if (Number(counter.count) > maxRequestsPerWindow) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((Number(counter.resetAt) - Date.now()) / 1000))));
       return res.status(429).json({ error: 'Too Many Requests' });
     }
     return next();
@@ -105,7 +107,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7).trim();
   if (!token) return res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization token' });
   try {
-    const decodedToken: any = await adminAuth.verifyIdToken(token, true);
+    const decodedToken: any = await adminAuth.verifyIdToken(token, true); // catch is intentionally in this failure path; auth must fail closed.
     const uid = decodedToken.uid; const email = decodedToken.email || `${uid}@user.local`; const emailVerified = !!decodedToken.email_verified;
     const exempt = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
     if (!emailVerified && !exempt) return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });
