@@ -61,6 +61,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: spr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d spr_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,10 +88,24 @@ jobs:
         run: npm run typecheck
       - name: Tests
         run: npm test -- --run
+      - name: Security attack regressions
+        run: npm run test:security
+      - name: Migration and route security gates
+        run: npm run security:gate
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
-      - name: Rate-limit fail-closed regression gate
-        run: node scripts/security-hardening-check.mjs
+      - name: Database migration integration test
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/spr_test
+        run: |
+          npx tsx scripts/migrate.ts
+          npx tsx scripts/migrate.ts
+          test "$(psql "$DATABASE_URL" -Atc 'SELECT count(*) FROM schema_migrations')" = "7"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM users LIMIT 1"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM trust_observations LIMIT 1"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM remediation_tasks LIMIT 1"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM remediation_verifications LIMIT 1"
       - name: Check for committed private-key material
         shell: bash
         run: |
