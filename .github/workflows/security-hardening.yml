@@ -90,6 +90,8 @@ jobs:
         run: npm test -- --run
       - name: Security attack regressions
         run: npm run test:security
+      - name: Live unauthenticated route attack test
+        run: npm run route:attack
       - name: Migration and route security gates
         run: npm run security:gate
       - name: Production dependency audit
