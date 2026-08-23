@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:security": "vitest run tests/security-rbac.test.ts",
+    "route:attack": "node scripts/route-attack-test.mjs",
     "security:gate": "node scripts/security-hardening-check.mjs && node scripts/migration-hardening-check.mjs && node scripts/route-security-gate.mjs",
     "zip:full": "node scripts/make-full-zip.js"
   },
@@ -63,7 +64,6 @@
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
-    "esbuild": "^0.28.1",
     "supertest": "^7.2.2",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
