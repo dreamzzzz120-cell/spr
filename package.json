@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:security": "vitest run tests/security-rbac.test.ts",
     "route:attack": "node scripts/route-attack-test.mjs",
-    "security:gate": "node scripts/security-hardening-check.mjs && node scripts/migration-hardening-check.mjs && node scripts/route-security-gate.mjs",
+    "security:gate": "node scripts/security-hardening-check.mjs && node scripts/migration-hardening-check.mjs && node scripts/route-security-gate.mjs && node scripts/agent-trust-security-gate.mjs",
     "zip:full": "node scripts/make-full-zip.js"
   },
   "dependencies": {
@@ -79,7 +79,7 @@
     },
     "uuid": "11.1.1",
     "retry-request": "8.0.4",
-    "teeny-request": "10.2.0",
+    "teeny-request": "10.1.4",
     "gaxios": "7.3.0"
   }
 }
