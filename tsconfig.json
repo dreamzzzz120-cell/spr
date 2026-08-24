@@ -18,6 +18,6 @@
     "types": ["node", "vitest"],
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
-  "include": ["src", "tests", "server.ts", "worker.ts"],
+  "include": ["src", "tests", "server.ts", "server-entry.ts", "worker.ts"],
   "exclude": ["node_modules", "dist"]
 }
