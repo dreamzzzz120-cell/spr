@@ -87,6 +87,7 @@ export default function Sidebar({
     }
     if (installedExtensions.includes('ai-brain')) {
       activeExtensionsList.push({ id: 'trust-brain', label: 'Trust Brain AI', icon: Brain, badge: 'AI' });
+      activeExtensionsList.push({ id: 'ai-agent-trust', label: 'AI Agent Trust', icon: ShieldCheck, badge: 'LIVE' });
     }
     if (installedExtensions.includes('fin-license')) {
       activeExtensionsList.push({ id: 'billing', label: 'Billing & Tokens', icon: CreditCard });
@@ -104,6 +105,7 @@ export default function Sidebar({
         { id: 'passports', label: 'Evidence', icon: FileCheck },
         { id: 'reports', label: 'Reports', icon: FileBarChart2 },
         { id: 'scans', label: 'Monitoring', icon: Radar },
+        ...activeExtensionsList
       ]
     }, {
       title: 'System',
@@ -221,8 +223,8 @@ export default function Sidebar({
 
                       {item.badge && (
                         <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold shrink-0 ${
-                          isActive 
-                            ? 'bg-white/20 text-white font-mono' 
+                          isActive
+                            ? 'bg-white/20 text-white font-mono'
                             : item.badgeColor || 'bg-slate-800 text-slate-400 font-mono'
                         }`}>
                           {item.badge}
@@ -252,7 +254,7 @@ export default function Sidebar({
               <span className="text-[8px] font-mono font-bold text-amber-400 uppercase tracking-wider block truncate">SPR Protocol Certified</span>
             </div>
             <span className="text-[10px] font-bold text-slate-100 mt-0.5 block truncate">Evidence workspace</span>
-              <span className="text-[8px] text-slate-400 font-mono block mt-0.5 leading-none">Evidence status is shown per record</span>
+            <span className="text-[8px] text-slate-400 font-mono block mt-0.5 leading-none">Evidence status is shown per record</span>
           </div>
         </div>
       </div>
