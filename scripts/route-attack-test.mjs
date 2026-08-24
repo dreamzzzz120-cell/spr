@@ -17,7 +17,7 @@ const publicRoutes = new Set([
 
 const protectedRoutes = routes.filter(route => !publicRoutes.has(`${route.method} ${route.path}`));
 const port = String(3900 + (process.pid % 100));
-const child = spawn(process.execPath, ['--import', 'tsx', 'server.ts'], {
+const child = spawn(process.execPath, ['--import', 'tsx', 'server-entry.ts'], {
   env: { ...process.env, NODE_ENV: 'test', SKIP_DOTENV: 'true', PORT: port },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -27,12 +27,12 @@ child.stdout.on('data', chunk => { output += chunk.toString(); });
 child.stderr.on('data', chunk => { output += chunk.toString(); });
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const request = async (method, path) => {
+const request = async (method, path, body = undefined) => {
   const concretePath = path.replace(/:[A-Za-z0-9_-]+/g, 'security-test-id');
   return fetch(`http://127.0.0.1:${port}${concretePath}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? '{}' : undefined,
+    body: body === undefined && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? '{}' : body,
     redirect: 'manual',
   });
 };
@@ -56,12 +56,22 @@ try {
     }
   }
 
+  // Agent Trust intentionally has two server-to-server endpoints that are not
+  // Firebase-authenticated. They must reject requests without the dedicated
+  // agent bearer key before touching agent state.
+  for (const path of ['/api/agent-trust/authorize', '/api/agent-trust/events']) {
+    const response = await request('POST', path);
+    if (response.status !== 401) {
+      failures.push(`POST ${path} returned ${response.status}; expected 401 without X-SPR-Agent-Key`);
+    }
+  }
+
   if (failures.length) {
     console.error('Unauthenticated route attack test failed:');
     failures.forEach(failure => console.error(`- ${failure}`));
     process.exitCode = 1;
   } else {
-    console.log(`Unauthenticated route attack test passed for ${protectedRoutes.length} protected routes.`);
+    console.log(`Unauthenticated route attack test passed for ${protectedRoutes.length} protected routes plus AI Agent Trust key gates.`);
   }
 } finally {
   child.kill('SIGTERM');
