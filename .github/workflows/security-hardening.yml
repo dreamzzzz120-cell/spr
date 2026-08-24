@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  actions: read
 
 concurrency:
   group: security-${{ github.ref }}
@@ -72,6 +70,8 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      - name: Production build
+        run: npm run build
       - name: Tests
         run: npm test -- --run
       - name: Security attack regressions
@@ -80,8 +80,10 @@ jobs:
         run: npm run route:attack
       - name: Migration and route security gates
         run: npm run security:gate
-      - name: Production dependency audit
-        run: npm audit --omit=dev --audit-level=high
+      - name: Full dependency audit
+        run: npm audit --audit-level=high
+      - name: Tracked secret scan
+        run: node scripts/secret-scan.mjs
       - name: Database migration integration test
         env:
           NODE_ENV: test
@@ -96,11 +98,3 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM remediation_verifications LIMIT 1"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM ai_agent_trust_agents LIMIT 1"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM ai_agent_trust_events LIMIT 1"
-      - name: Check for committed private-key material
-        shell: bash
-        run: |
-          set -euo pipefail
-          if git grep -nEI --exclude='*.lock' --exclude-dir=node_modules '-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----' -- ':!*.md'; then
-            echo 'Private-key material detected in tracked source files.'
-            exit 1
-          fi
