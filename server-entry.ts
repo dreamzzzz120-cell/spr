@@ -1,10 +1,10 @@
 /**
  * Hardened production entrypoint.
  *
- * server.ts owns the existing application. This entrypoint only inserts the
- * AI Agent Trust router immediately after the global /api rate limiter and
- * before the existing authenticated monitoring router. That keeps the new
- * feature isolated without rewriting the existing application server.
+ * server.ts owns the existing application. This entrypoint inserts the AI Agent
+ * Trust router immediately after the global /api rate limiter and before the
+ * existing authenticated monitoring router, without rewriting the existing
+ * application server.
  */
 import express from 'express';
 import { createAgentTrustRouter } from './src/routes/agent-trust.ts';
@@ -25,4 +25,7 @@ express.application.use = function patchedUse(this: any, ...args: any[]) {
   return result;
 };
 
-await import('./server.ts');
+void import('./server.ts').catch((error) => {
+  console.error('[SPR] Failed to initialize hardened server entrypoint:', error);
+  process.exitCode = 1;
+});
