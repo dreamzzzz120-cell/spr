@@ -62,7 +62,6 @@
     "archiver": "^5.3.1",
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
-    "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
@@ -80,7 +79,7 @@
     },
     "uuid": "11.1.1",
     "retry-request": "8.0.4",
-    "teeny-request": "10.1.4",
+    "teeny-request": "10.2.0",
     "gaxios": "7.3.0"
   }
 }
