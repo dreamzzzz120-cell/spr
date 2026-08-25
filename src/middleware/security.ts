@@ -78,18 +78,28 @@ export function setRateLimiterStore(s: RateLimitStore) {
   sharedStore = s;
 }
 
+function rateLimitPolicy(req: Request): { limit: number; bucket: string } {
+  const path = req.path.toLowerCase();
+  if (path.includes('/scan') || path.includes('/pipeline')) return { limit: 20, bucket: 'expensive-scan' };
+  if (path.includes('/ai') || path.includes('/agent')) return { limit: 30, bucket: 'ai' };
+  if (path.includes('/auth/')) return { limit: 30, bucket: 'auth' };
+  return { limit: maxRequestsPerWindow, bucket: 'default' };
+}
+
 export const rateLimiter = async (req: Request, res: Response, next: NextFunction) => {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const tenantId = (req as AuthenticatedRequest).user?.tenantId;
-  const key = tenantId ? `rl:tenant:${tenantId}:ip:${ip}` : `rl:ip:${ip}`;
+  const policy = rateLimitPolicy(req);
+  const principal = tenantId ? `tenant:${tenantId}` : `ip:${ip}`;
+  const key = `rl:v2:${policy.bucket}:${req.method}:${principal}`;
   try {
-    const counter = await sharedStore.incr(key, rateLimitWindowMs, maxRequestsPerWindow);
+    const counter = await sharedStore.incr(key, rateLimitWindowMs, policy.limit);
     if (!counter || !Number.isFinite(Number(counter.count)) || Number(counter.count) < 1 || !Number.isFinite(Number(counter.resetAt)) || Number(counter.resetAt) <= 0) throw new Error('Invalid rate-limit store result');
-    const remaining = Math.max(0, maxRequestsPerWindow - Number(counter.count));
-    res.setHeader('X-RateLimit-Limit', String(maxRequestsPerWindow));
+    const remaining = Math.max(0, policy.limit - Number(counter.count));
+    res.setHeader('X-RateLimit-Limit', String(policy.limit));
     res.setHeader('X-RateLimit-Remaining', String(remaining));
     res.setHeader('X-RateLimit-Reset', String(Math.ceil(Number(counter.resetAt) / 1000)));
-    if (Number(counter.count) > maxRequestsPerWindow) {
+    if (Number(counter.count) > policy.limit) {
       res.setHeader('Retry-After', String(Math.max(1, Math.ceil((Number(counter.resetAt) - Date.now()) / 1000))));
       return res.status(429).json({ error: 'Too Many Requests' });
     }
@@ -107,7 +117,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7).trim();
   if (!token) return res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization token' });
   try {
-    const decodedToken: any = await adminAuth.verifyIdToken(token, true); // catch -> res.status(401) below; authentication fails closed.
+    const decodedToken: any = await adminAuth.verifyIdToken(token, true);
     const uid = decodedToken.uid; const email = decodedToken.email || `${uid}@user.local`; const emailVerified = !!decodedToken.email_verified;
     const exempt = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
     if (!emailVerified && !exempt) return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });
