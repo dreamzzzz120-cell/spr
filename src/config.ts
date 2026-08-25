@@ -120,7 +120,7 @@ export const config = {
     password: parsedEnv.SQL_PASSWORD,
     name: parsedEnv.SQL_DB_NAME,
     ssl: parsedEnv.SQL_SSL ? ['true', 'require'].includes(parsedEnv.SQL_SSL.toLowerCase()) : false,
-    poolMax: parseNumber(parsedEnv.SQL_POOL_MAX, 20),
+    poolMax: parseNumber(parsedEnv.SQL_POOL_MAX, 12),
     connectionTimeoutMs: parseNumber(parsedEnv.SQL_CONNECTION_TIMEOUT_MS, 10000),
     idleTimeoutMs: parseNumber(parsedEnv.SQL_IDLE_TIMEOUT_MS, 30000),
     queryTimeoutMs: parseNumber(parsedEnv.SQL_QUERY_TIMEOUT_MS, 5000),
@@ -178,33 +178,3 @@ function hasTlsRedisConfig(): boolean {
     return false;
   }
 }
-
-export function validateConfiguration() {
-  if (!config.isProduction) return;
-
-  const missing: string[] = [];
-  if (!config.appUrl) missing.push('APP_URL');
-  if (config.allowedOrigins.length === 0) missing.push('APP_ALLOWED_ORIGINS');
-  if (!config.enforceHttps) missing.push('ENFORCE_HTTPS=true');
-  if (!config.trustProxy) missing.push('TRUST_PROXY=true');
-  if (!config.trustProxyHops) missing.push('TRUST_PROXY_HOPS');
-  if (!config.database.isConfigured) missing.push('DATABASE_URL or complete SQL_* configuration');
-  if (!hasTlsDatabaseConfig()) missing.push('DATABASE TLS (sslmode=require/verify-* or SQL_SSL=true)');
-  if (!config.redis.url) missing.push('REDIS_URL');
-  if (!hasTlsRedisConfig()) missing.push('REDIS_URL must use rediss:// in production');
-  if (!config.firebase.serviceAccountKey && !config.firebase.googleApplicationCredentials) missing.push('FIREBASE_SERVICE_ACCOUNT_KEY or GOOGLE_APPLICATION_CREDENTIALS');
-  if (!config.stripe.secretKey) missing.push('STRIPE_SECRET_KEY');
-  if (!config.stripe.webhookSecret) missing.push('STRIPE_WEBHOOK_SECRET');
-  if (parsedEnv.RATE_LIMIT_FAIL_OPEN === 'true' || parsedEnv.RATE_LIMIT_FAIL_OPEN === '1') missing.push('RATE_LIMIT_FAIL_OPEN must be false/unset');
-
-  if (missing.length) {
-    throw new Error(`Production security configuration is incomplete: ${missing.join(', ')}`);
-  }
-}
-
-export const configurationCatalog = configurationMetadata.map((entry) => ({
-  name: entry.name,
-  category: entry.category,
-  description: entry.description,
-  requiredInProduction: entry.requiredInProduction,
-}));
