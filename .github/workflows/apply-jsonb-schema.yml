@@ -1,0 +1,49 @@
+name: Apply JSONB schema hardening
+
+on:
+  push:
+    branches: [hardening/db-p0-clean]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hardening/db-p0-clean
+          fetch-depth: 0
+      - name: Update Drizzle schema
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/db/schema.ts')
+          s = p.read_text()
+          old = "import { integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';"
+          new = "import { integer, jsonb, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';"
+          if old not in s:
+              raise SystemExit('schema import pattern not found')
+          s = s.replace(old, new, 1)
+          replacements = {
+              "sbom: text('sbom').notNull().default('[]'), // JSON stringified component array": "sbom: jsonb('sbom').$type<unknown[]>().notNull().default([]), // Native JSONB component array",
+              "evidence: text('evidence').notNull().default('[]'), // JSON stringified evidence array": "evidence: jsonb('evidence').$type<unknown[]>().notNull().default([]), // Native JSONB evidence array",
+              "vulnerabilities: text('vulnerabilities').notNull().default('[]'), // JSON stringified vulnerability array": "vulnerabilities: jsonb('vulnerabilities').$type<unknown[]>().notNull().default([]), // Native JSONB vulnerability array",
+              "timeline: text('timeline').notNull().default('[]'), // JSON stringified timeline events": "timeline: jsonb('timeline').$type<unknown[]>().notNull().default([]), // Native JSONB timeline events",
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'schema field pattern not found: {old}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+      - name: Commit schema update
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/db/schema.ts
+          git diff --cached --quiet || git commit -m 'hardening(db): align Drizzle schema with passport jsonb'
+          git push origin HEAD:hardening/db-p0-clean

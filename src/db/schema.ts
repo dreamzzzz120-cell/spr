@@ -4,7 +4,7 @@
  */
 
 import { relations } from 'drizzle-orm';
-import { integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { integer, jsonb, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 
 // 1. Users Table (for Auth with RBAC role and multi-tenant mapping)
 export const users = pgTable('users', {
@@ -64,10 +64,10 @@ export const passports = pgTable('passports', {
   fileHash: text('file_hash').notNull(),
   licenseType: text('license_type').notNull(),
   aiSummary: text('ai_summary').notNull().default(''),
-  sbom: text('sbom').notNull().default('[]'), // JSON stringified component array
-  evidence: text('evidence').notNull().default('[]'), // JSON stringified evidence array
-  vulnerabilities: text('vulnerabilities').notNull().default('[]'), // JSON stringified vulnerability array
-  timeline: text('timeline').notNull().default('[]'), // JSON stringified timeline events
+  sbom: jsonb('sbom').$type<unknown[]>().notNull().default([]), // Native JSONB component array
+  evidence: jsonb('evidence').$type<unknown[]>().notNull().default([]), // Native JSONB evidence array
+  vulnerabilities: jsonb('vulnerabilities').$type<unknown[]>().notNull().default([]), // Native JSONB vulnerability array
+  timeline: jsonb('timeline').$type<unknown[]>().notNull().default([]), // Native JSONB timeline events
 });
 
 // 4. Scans Table (with tenant_id isolation)
