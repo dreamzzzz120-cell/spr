@@ -20,13 +20,13 @@ export const databaseConfigurationSummary = {
   host: config.database.connectionString ? 'DATABASE_URL' : config.database.host || 'UNCONFIGURED',
   database: config.database.name || 'UNCONFIGURED',
   ssl: config.database.ssl,
-  poolMax: getNumericEnv(config.database.poolMax?.toString(), 20),
+  // Keep headroom for workers, migrations and platform-side connections.
+  poolMax: getNumericEnv(config.database.poolMax?.toString(), 12),
   connectionTimeoutMillis: getNumericEnv(config.database.connectionTimeoutMs?.toString(), 10000),
   idleTimeoutMillis: getNumericEnv(config.database.idleTimeoutMs?.toString(), 30000),
   queryTimeoutMillis: getNumericEnv(config.database.queryTimeoutMs?.toString(), 5000),
 };
 
-// Function to create a new connection pool with Object configuration
 export const createPool = () => {
   if (!isDatabaseConfigured) {
     console.warn('[Database] SQL configuration is incomplete. DB readiness will report DB_MISCONFIGURED until DATABASE_URL or SQL_HOST, SQL_USER, SQL_PASSWORD and SQL_DB_NAME are configured.');
@@ -56,10 +56,8 @@ export const createPool = () => {
   });
 };
 
-// Create a pool instance
 const pool = createPool();
 
-// Prevent unhandled pool-level errors from crashing the application
 pool.on('error', (err) => {
   console.error('[Database] Unexpected error on idle SQL pool client:', err?.message || err);
 });
@@ -76,5 +74,4 @@ pool.on('remove', () => {
   console.info('[Database] PostgreSQL pool client removed');
 });
 
-// Initialize Drizzle with the pool and schema
 export const db = drizzle(pool, { schema });
