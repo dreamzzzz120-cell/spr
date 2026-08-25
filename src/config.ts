@@ -43,6 +43,7 @@ const envSchema = z.object({
   APP_ALLOWED_ORIGINS: optionalTrimmedString,
   ENFORCE_HTTPS: optionalBooleanString,
   TRUST_PROXY: optionalBooleanString,
+  TRUST_PROXY_HOPS: optionalPositiveIntegerString,
   ALLOW_IFRAME: optionalBooleanString,
   SQL_HOST: optionalTrimmedString,
   SQL_USER: optionalTrimmedString,
@@ -110,6 +111,7 @@ export const config = {
   allowedOrigins: parseCsv(parsedEnv.APP_ALLOWED_ORIGINS),
   enforceHttps: parseBoolean(parsedEnv.ENFORCE_HTTPS, false),
   trustProxy: parseBoolean(parsedEnv.TRUST_PROXY, false),
+  trustProxyHops: parsedEnv.TRUST_PROXY_HOPS ? Number(parsedEnv.TRUST_PROXY_HOPS) : 0,
   allowIframe: parseBoolean(parsedEnv.ALLOW_IFRAME, false),
   database: {
     connectionString: parsedEnv.DATABASE_URL,
@@ -140,6 +142,7 @@ const configurationMetadata = [
   { name: 'APP_ALLOWED_ORIGINS', category: 'requiredProduction', description: 'Exact comma-separated list of browser origins allowed to call the API.', requiredInProduction: true },
   { name: 'ENFORCE_HTTPS', category: 'requiredProduction', description: 'Force HTTPS redirection in production.', requiredInProduction: true },
   { name: 'TRUST_PROXY', category: 'requiredProduction', description: 'Enable reverse proxy support when production is behind a TLS-terminating proxy.', requiredInProduction: true },
+  { name: 'TRUST_PROXY_HOPS', category: 'requiredProduction', description: 'Exact number of trusted reverse-proxy hops used for client IP derivation.', requiredInProduction: true },
   { name: 'ALLOW_IFRAME', category: 'optional', description: 'Allow trusted iframe embedding when explicitly required.', requiredInProduction: false },
   { name: 'DATABASE_URL', category: 'requiredProduction', description: 'PostgreSQL connection string.', requiredInProduction: true },
   { name: 'SQL_HOST', category: 'legacyAlternative', description: 'PostgreSQL host when DATABASE_URL is not used.', requiredInProduction: false },
@@ -155,6 +158,27 @@ const configurationMetadata = [
   { name: 'REDIS_URL', category: 'requiredProduction', description: 'Redis URL for shared fail-closed rate limiting.', requiredInProduction: true },
 ] as const;
 
+function hasTlsDatabaseConfig(): boolean {
+  if (config.database.ssl) return true;
+  if (!config.database.connectionString) return false;
+  try {
+    const parsed = new URL(config.database.connectionString);
+    const sslMode = parsed.searchParams.get('sslmode')?.toLowerCase();
+    return sslMode === 'require' || sslMode === 'verify-ca' || sslMode === 'verify-full';
+  } catch {
+    return false;
+  }
+}
+
+function hasTlsRedisConfig(): boolean {
+  if (!config.redis.url) return false;
+  try {
+    return new URL(config.redis.url).protocol === 'rediss:';
+  } catch {
+    return false;
+  }
+}
+
 export function validateConfiguration() {
   if (!config.isProduction) return;
 
@@ -163,8 +187,11 @@ export function validateConfiguration() {
   if (config.allowedOrigins.length === 0) missing.push('APP_ALLOWED_ORIGINS');
   if (!config.enforceHttps) missing.push('ENFORCE_HTTPS=true');
   if (!config.trustProxy) missing.push('TRUST_PROXY=true');
+  if (!config.trustProxyHops) missing.push('TRUST_PROXY_HOPS');
   if (!config.database.isConfigured) missing.push('DATABASE_URL or complete SQL_* configuration');
+  if (!hasTlsDatabaseConfig()) missing.push('DATABASE TLS (sslmode=require/verify-* or SQL_SSL=true)');
   if (!config.redis.url) missing.push('REDIS_URL');
+  if (!hasTlsRedisConfig()) missing.push('REDIS_URL must use rediss:// in production');
   if (!config.firebase.serviceAccountKey && !config.firebase.googleApplicationCredentials) missing.push('FIREBASE_SERVICE_ACCOUNT_KEY or GOOGLE_APPLICATION_CREDENTIALS');
   if (!config.stripe.secretKey) missing.push('STRIPE_SECRET_KEY');
   if (!config.stripe.webhookSecret) missing.push('STRIPE_WEBHOOK_SECRET');
