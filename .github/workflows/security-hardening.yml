@@ -11,9 +11,11 @@ on:
 permissions:
   contents: read
 
+# Never cancel an in-flight security audit. A newer push must not erase the
+# security receipt for the previous commit; each commit needs an auditable result.
 concurrency:
-  group: security-${{ github.ref }}
-  cancel-in-progress: true
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   codeql:
