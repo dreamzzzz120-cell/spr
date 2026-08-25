@@ -11,8 +11,6 @@ on:
 permissions:
   contents: read
 
-# Never cancel an in-flight security audit. A newer push must not erase the
-# security receipt for the previous commit; each commit needs an auditable result.
 concurrency:
   group: security-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -95,10 +93,12 @@ jobs:
         run: |
           npx tsx scripts/migrate.ts
           npx tsx scripts/migrate.ts
-          test "$(psql "$DATABASE_URL" -Atc 'SELECT count(*) FROM schema_migrations')" = "8"
+          test "$(psql "$DATABASE_URL" -Atc 'SELECT count(*) FROM schema_migrations')" = "9"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM users LIMIT 1"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM trust_observations LIMIT 1"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM remediation_tasks LIMIT 1"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM remediation_verifications LIMIT 1"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM ai_agent_trust_agents LIMIT 1"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM ai_agent_trust_events LIMIT 1"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM passports WHERE jsonb_typeof(sbom) = 'array' LIMIT 1"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM passports WHERE jsonb_typeof(evidence) = 'array' LIMIT 1"
