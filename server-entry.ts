@@ -1,10 +1,11 @@
 /**
  * Hardened production entrypoint.
  *
- * server.ts owns the existing application. This entrypoint inserts the AI Agent
- * Trust router immediately after the global /api rate limiter and before the
- * existing authenticated monitoring router, without rewriting the existing
- * application server.
+ * server.ts owns the existing application. This compatibility entrypoint
+ * mounts the Agent Trust router without replacing Express internals.
+ *
+ * Express's overloaded use() signature in this dependency set types Router
+ * handlers too narrowly; the cast is isolated to this compatibility boundary.
  */
 import express from 'express';
 import { createAgentTrustRouter } from './src/routes/agent-trust.ts';
@@ -15,11 +16,9 @@ let agentTrustMounted = false;
 express.application.use = function patchedUse(this: any, ...args: any[]) {
   const result = originalUse.apply(this, args as any);
 
-  // server.ts first mounts the global /api rate limiter, then the existing
-  // monitoring router. Insert Agent Trust between those two layers.
   if (!agentTrustMounted && args[0] === '/api' && typeof args[1] === 'function') {
     agentTrustMounted = true;
-    originalUse.call(this, '/api', createAgentTrustRouter());
+    originalUse.call(this, '/api', createAgentTrustRouter() as any);
   }
 
   return result;
