@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Bot, CheckCircle2, Copy, KeyRound, Lock, Plus, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { Activity, AlertTriangle, Bot, CheckCircle2, Copy, KeyRound, Lock, Plus, RefreshCw, ShieldCheck, X, XCircle } from 'lucide-react';
 import { apiFetch } from '../utils/apiClient';
 
 interface AgentRecord {
