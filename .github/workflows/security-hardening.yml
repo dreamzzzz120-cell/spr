@@ -84,6 +84,8 @@ jobs:
         run: npm audit --audit-level=high
       - name: Tracked secret scan
         run: node scripts/secret-scan.mjs
+      - name: Production container build
+        run: docker build --pull --no-cache --tag spr:security-gate .
       - name: Database migration integration test
         env:
           NODE_ENV: test
