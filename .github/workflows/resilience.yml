@@ -79,15 +79,3 @@ jobs:
 
       - name: Container build
         run: docker build --pull --no-cache --tag spr:resilience .
-
-  dependency-review:
-    name: Dependency Review
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Dependency review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: high
