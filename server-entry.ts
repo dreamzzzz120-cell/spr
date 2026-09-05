@@ -22,7 +22,8 @@ let psaMounted = false;
   return originalJson({
     ...options,
     verify(req: any, res: any, buf: Buffer, encoding: string) {
-      req.rawBody = buf.toString(encoding || 'utf8');
+      const bufferEncoding = encoding as BufferEncoding;
+      req.rawBody = buf.toString(bufferEncoding || 'utf8');
       if (typeof callerVerify === 'function') callerVerify(req, res, buf, encoding);
     },
   });
