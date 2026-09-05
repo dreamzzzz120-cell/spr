@@ -24,6 +24,12 @@ export function verifyPsaSignature(rawBody: string, signature: string, secret: s
 export function applyPsaDisposition(current: FindingStatus, status: string, disposition?: string | null): FindingStatus | null {
   const requested = normalizePsaDisposition(status, disposition);
   if (!requested) return null;
+  // A subsequent "resolved"/closed claim must trigger verification when the
+  // finding is already in a remediation-claimed state; never silently accept it.
+  const raw = `${status}|${disposition ?? ''}`.toLowerCase();
+  if (current === 'REMEDIATION_CLAIMED' && (raw.includes('resolved') || raw.includes('closed') || raw.includes('done'))) {
+    throw new Error('FINDING_VERIFICATION_REQUIRED');
+  }
   return nextFindingStatus(current, requested, 'PSA');
 }
 
