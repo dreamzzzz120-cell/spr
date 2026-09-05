@@ -4,7 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.ts';
 import { psaEvents, psaTicketLinks, vulnerabilityFindings, findingDispositionHistory } from '../db/vex-psa-schema.ts';
-import { AuthenticatedRequest, requireAuth, requireRole } from '../middleware/security.ts';
+import { AuthenticatedRequest, rateLimiter, requireAuth, requireRole } from '../middleware/security.ts';
 import { applyPsaDisposition, eventIdempotencyKey, verifyPsaSignature } from '../lib/psa-sync.ts';
 
 const linkSchema = z.object({
@@ -37,7 +37,7 @@ function isUniqueViolation(error: unknown): boolean {
 export function createPsaRouter() {
   const router = Router();
 
-  router.get('/findings', requireAuth, async (req: AuthenticatedRequest, res) => {
+  router.get('/findings', rateLimiter, requireAuth, async (req: AuthenticatedRequest, res) => {
     const rows = await db.select({
       id: vulnerabilityFindings.id,
       assetId: vulnerabilityFindings.assetId,
@@ -55,7 +55,7 @@ export function createPsaRouter() {
     res.json(rows);
   });
 
-  router.post('/tickets/link', requireAuth, requireRole(['Admin', 'Technician']), async (req: AuthenticatedRequest, res) => {
+  router.post('/tickets/link', rateLimiter, requireAuth, requireRole(['Admin', 'Technician']), async (req: AuthenticatedRequest, res) => {
     const parsed = linkSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
     const { findingId, provider, externalTicketId } = parsed.data;
@@ -85,7 +85,7 @@ export function createPsaRouter() {
     }
   });
 
-  router.get('/events', requireAuth, requireRole(['Admin', 'Technician']), async (req: AuthenticatedRequest, res) => {
+  router.get('/events', rateLimiter, requireAuth, requireRole(['Admin', 'Technician']), async (req: AuthenticatedRequest, res) => {
     const rows = await db.select().from(psaEvents)
       .where(eq(psaEvents.tenantId, req.user!.tenantId))
       .orderBy(desc(psaEvents.receivedAt)).limit(200);
@@ -94,7 +94,7 @@ export function createPsaRouter() {
 
   // Inbound PSA events are authenticated by an HMAC secret, not Firebase, because
   // the provider is an external system. The tenant ID is part of the signed body.
-  router.post('/webhooks/:provider', async (req: AuthenticatedRequest, res) => {
+  router.post('/webhooks/:provider', rateLimiter, async (req: AuthenticatedRequest, res) => {
     const secret = process.env.PSA_WEBHOOK_SECRET;
     const signature = req.header('x-spr-signature');
     const timestamp = req.header('x-spr-timestamp');
