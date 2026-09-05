@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { avg, count, eq } from 'drizzle-orm';
+import { and, avg, count, eq } from 'drizzle-orm';
 import { db } from '../db/index.ts';
 import {
   alerts,
@@ -18,14 +18,19 @@ import { psaEvents, vulnerabilityFindings } from '../db/vex-psa-schema.ts';
 import { AuthenticatedRequest, rateLimiter, requireAuth, requireRole } from '../middleware/security.ts';
 
 /**
- * Founder telemetry is intentionally read-only. Financial impact is not
- * fabricated: SPR currently does not persist a verified dollar-impact model,
- * so capitalProtected is explicitly reported as unavailable.
+ * Founder telemetry is intentionally read-only and tenant-scoped. An Owner
+ * role is a tenant role; it must never grant cross-tenant visibility merely
+ * because the route is intended for an owner/founder dashboard.
+ *
+ * Financial impact is not fabricated: SPR currently does not persist a
+ * verified dollar-impact model, so capitalProtected is explicitly unavailable.
  */
 export function createFounderRouter() {
   const router = Router();
 
-  router.get('/metrics', rateLimiter, requireAuth, requireRole(['Owner']), async (_req: AuthenticatedRequest, res) => {
+  router.get('/metrics', rateLimiter, requireAuth, requireRole(['Owner']), async (req: AuthenticatedRequest, res) => {
+    const tenantId = req.user!.tenantId;
+
     const [
       userCount,
       clientCount,
@@ -39,17 +44,17 @@ export function createFounderRouter() {
       avgScanDuration,
       averagePassportScore,
     ] = await Promise.all([
-      db.select({ value: count() }).from(users),
-      db.select({ value: count() }).from(clients),
-      db.select({ value: count() }).from(passports),
-      db.select({ value: count() }).from(scans),
-      db.select({ value: count() }).from(scans).where(eq(scans.status, 'Completed')),
-      db.select({ value: count() }).from(alerts).where(eq(alerts.status, 'Active')),
-      db.select({ value: count() }).from(vulnerabilityFindings).where(eq(vulnerabilityFindings.status, 'OPEN')),
-      db.select({ value: count() }).from(trustObservations),
-      db.select({ value: count() }).from(psaEvents),
-      db.select({ value: avg(scans.durationMs) }).from(scans),
-      db.select({ value: avg(passports.overallScore) }).from(passports),
+      db.select({ value: count() }).from(users).where(eq(users.tenantId, tenantId)),
+      db.select({ value: count() }).from(clients).where(eq(clients.tenantId, tenantId)),
+      db.select({ value: count() }).from(passports).where(eq(passports.tenantId, tenantId)),
+      db.select({ value: count() }).from(scans).where(eq(scans.tenantId, tenantId)),
+      db.select({ value: count() }).from(scans).where(and(eq(scans.tenantId, tenantId), eq(scans.status, 'Completed'))),
+      db.select({ value: count() }).from(alerts).where(and(eq(alerts.tenantId, tenantId), eq(alerts.status, 'Active'))),
+      db.select({ value: count() }).from(vulnerabilityFindings).where(and(eq(vulnerabilityFindings.tenantId, tenantId), eq(vulnerabilityFindings.status, 'OPEN'))),
+      db.select({ value: count() }).from(trustObservations).where(eq(trustObservations.tenantId, tenantId)),
+      db.select({ value: count() }).from(psaEvents).where(eq(psaEvents.tenantId, tenantId)),
+      db.select({ value: avg(scans.durationMs) }).from(scans).where(eq(scans.tenantId, tenantId)),
+      db.select({ value: avg(passports.overallScore) }).from(passports).where(eq(passports.tenantId, tenantId)),
     ]);
 
     const usersTotal = Number(userCount[0]?.value ?? 0);
