@@ -15,7 +15,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { psaEvents, vulnerabilityFindings } from '../db/vex-psa-schema.ts';
-import { AuthenticatedRequest, requireAuth, requireRole } from '../middleware/security.ts';
+import { AuthenticatedRequest, rateLimiter, requireAuth, requireRole } from '../middleware/security.ts';
 
 /**
  * Founder telemetry is intentionally read-only. Financial impact is not
@@ -25,7 +25,7 @@ import { AuthenticatedRequest, requireAuth, requireRole } from '../middleware/se
 export function createFounderRouter() {
   const router = Router();
 
-  router.get('/metrics', requireAuth, requireRole(['Owner']), async (_req: AuthenticatedRequest, res) => {
+  router.get('/metrics', rateLimiter, requireAuth, requireRole(['Owner']), async (_req: AuthenticatedRequest, res) => {
     const [
       userCount,
       clientCount,
