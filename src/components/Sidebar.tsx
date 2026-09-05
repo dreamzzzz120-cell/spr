@@ -1,7 +1,7 @@
 /** SPR navigation: organize the product around four jobs — Know, Prove, Watch, Use. */
 import React, { useMemo, useState } from 'react';
 import SPRLogo from './SPRLogo';
-import { Activity, Bell, Boxes, Building2, ChevronDown, FileBarChart2, FileCheck, Globe2, LayoutDashboard, Network, PlugZap, Search, Settings, Shield, Sparkles, Workflow, Radar } from 'lucide-react';
+import { Activity, Bell, Boxes, Building2, ChevronDown, FileBarChart2, FileCheck, Globe2, LayoutDashboard, Network, PlugZap, Search, Settings, Shield, Sparkles, Workflow, Radar, Handshake } from 'lucide-react';
 import { Client } from '../types';
 interface Props { clients: Client[]; selectedClientId: string; setSelectedClientId: (id: string) => void; activeTab: string; setActiveTab: (tab: string) => void; alertCount: number; installedExtensions: string[]; userRole: string; }
 type NavItem = { id: string; label: string; icon: any; badge?: string };
@@ -33,11 +33,12 @@ export default function Sidebar({ clients, selectedClientId, setSelectedClientId
         <NavItemButton item={{ id: 'security', label: 'Security Evidence', icon: Shield }} active={activeTab === 'security'} onClick={go} />
         <NavItemButton item={{ id: 'assets', label: 'Software Inventory', icon: Boxes }} active={activeTab === 'assets'} onClick={go} />
       </NavSection>
-      <NavSection title="02 · PROVE" subtitle="Create & verify" active={isAny(['passports','integrations','reports','marketplace'])}>
+      <NavSection title="02 · PROVE" subtitle="Create & verify" active={isAny(['passports','integrations','reports','marketplace','partner-program'])}>
         <NavItemButton item={{ id: 'passports', label: 'Software Passports', icon: FileCheck }} active={activeTab === 'passports'} onClick={go} />
         <NavItemButton item={{ id: 'integrations', label: 'Connect Evidence', icon: PlugZap }} active={activeTab === 'integrations'} onClick={go} />
         <NavItemButton item={{ id: 'reports', label: 'Verification Reports', icon: FileBarChart2 }} active={activeTab === 'reports'} onClick={go} />
         <NavItemButton item={{ id: 'marketplace', label: 'Add Sources', icon: Sparkles }} active={activeTab === 'marketplace'} onClick={go} />
+        <NavItemButton item={{ id: 'partner-program', label: 'MSP Partner Program', icon: Handshake }} active={activeTab === 'partner-program'} onClick={go} />
       </NavSection>
       <NavSection title="03 · WATCH" subtitle="Continuous trust" active={isAny(['scans','alerts','compliance','ai-swarm'])}>
         <NavItemButton item={{ id: 'scans', label: 'Monitor Changes', icon: Radar }} active={activeTab === 'scans'} onClick={go} />
