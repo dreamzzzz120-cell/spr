@@ -11,6 +11,19 @@ export interface PsaWebhookEnvelope {
   payload: Record<string, unknown>;
 }
 
+/**
+ * Derive a unique provider-facing webhook secret from a server-side root key.
+ * The root secret is never shared with PSA providers. Compromise of one
+ * tenant/provider credential therefore does not reveal credentials for others.
+ */
+export function derivePsaWebhookSecret(rootSecret: string, tenantId: string, provider: string): string {
+  if (!rootSecret || !tenantId || !provider) throw new Error('PSA_WEBHOOK_DERIVATION_INPUT_REQUIRED');
+  return crypto
+    .createHmac('sha256', rootSecret)
+    .update(`spr.psa.webhook.v1\0${tenantId}\0${provider}`, 'utf8')
+    .digest('hex');
+}
+
 export function verifyPsaSignature(rawBody: string, signature: string, secret: string, timestamp: string, maxAgeSeconds = 300): boolean {
   const ts = Number(timestamp);
   if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > maxAgeSeconds) return false;
