@@ -33,7 +33,9 @@ jobs:
         run: npm ci
 
       - name: Apply npm security fixes
-        run: npm audit fix
+        shell: bash
+        run: |
+          npm audit fix || true
 
       - name: Verify no high or critical advisories remain
         run: npm audit --audit-level=high
