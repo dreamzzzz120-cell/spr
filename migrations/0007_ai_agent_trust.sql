@@ -1,3 +1,5 @@
+BEGIN;
+
 -- SPR AI Agent Trust: isolated agent identities, pre-action authorization, and immutable observations.
 -- Secrets are never stored in plaintext; only a SHA-256 digest of the bearer key is persisted.
 
@@ -45,3 +47,5 @@ CREATE INDEX IF NOT EXISTS ai_agent_trust_events_agent_time_idx
 
 CREATE INDEX IF NOT EXISTS ai_agent_trust_events_boundary_idx
   ON ai_agent_trust_events (tenant_id, boundary_state, observed_at DESC);
+
+COMMIT;
