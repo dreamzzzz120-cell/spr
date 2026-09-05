@@ -32,6 +32,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Pin patched qs transitive dependency
+        run: |
+          npm pkg set overrides.qs=6.16.0
+          npm install --package-lock-only
+
       - name: Apply npm security fixes
         shell: bash
         run: |
