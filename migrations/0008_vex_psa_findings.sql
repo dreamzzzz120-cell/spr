@@ -1,8 +1,8 @@
+BEGIN;
+
 -- SPDX-License-Identifier: Apache-2.0
 -- Evidence-first vulnerability disposition + VEX + bidirectional PSA synchronization.
 -- Idempotent: safe to replay.
-
-BEGIN;
 
 CREATE TABLE IF NOT EXISTS vulnerability_findings (
   id text PRIMARY KEY,
@@ -80,7 +80,6 @@ CREATE TABLE IF NOT EXISTS psa_events (
   tenant_id text NOT NULL,
   provider text NOT NULL,
   external_event_id text NOT NULL,
-  external_ticket_id text,
   event_type text NOT NULL,
   payload_hash text NOT NULL,
   payload text NOT NULL,
