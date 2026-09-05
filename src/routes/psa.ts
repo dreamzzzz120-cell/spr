@@ -30,6 +30,10 @@ function rawBody(req: AuthenticatedRequest): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === '23505';
+}
+
 export function createPsaRouter() {
   const router = Router();
 
@@ -70,8 +74,8 @@ export function createPsaRouter() {
         lastSyncedAt: now, createdAt: now, updatedAt: now,
       }).returning();
       return res.status(201).json(created);
-    } catch (error: any) {
-      if (error?.code !== '23505') throw error;
+    } catch (error: unknown) {
+      if (!isUniqueViolation(error)) throw error;
       const existing = await db.select().from(psaTicketLinks).where(and(
         eq(psaTicketLinks.tenantId, tenantId),
         eq(psaTicketLinks.findingId, findingId),
@@ -120,61 +124,72 @@ export function createPsaRouter() {
       )).then(rows => rows[0]);
     if (existing) return res.status(200).json({ accepted: true, duplicate: true, eventKey });
 
-    const [event] = await db.insert(psaEvents).values({
-      id: `psa-event-${crypto.randomUUID()}`,
-      tenantId, provider, externalEventId: payload.eventId,
-      externalTicketId: payload.ticketId, eventType: payload.eventType,
-      payloadHash, payload: body, receivedAt,
-    }).returning();
+    let event;
+    try {
+      [event] = await db.insert(psaEvents).values({
+        id: `psa-event-${crypto.randomUUID()}`,
+        tenantId, provider, externalEventId: payload.eventId,
+        externalTicketId: payload.ticketId, eventType: payload.eventType,
+        payloadHash, payload: body, receivedAt,
+      }).returning();
+    } catch (error: unknown) {
+      // Two identical deliveries can pass the SELECT above concurrently. The
+      // database unique constraint is the authoritative idempotency boundary.
+      if (!isUniqueViolation(error)) throw error;
+      return res.status(200).json({ accepted: true, duplicate: true, eventKey });
+    }
 
     try {
-      const link = await db.select().from(psaTicketLinks).where(and(
-        eq(psaTicketLinks.tenantId, tenantId),
-        eq(psaTicketLinks.provider, provider),
-        eq(psaTicketLinks.externalTicketId, payload.ticketId),
-      )).then(rows => rows[0]);
-      if (!link) {
-        await db.update(psaEvents).set({ processingStatus: 'IGNORED', processedAt: new Date().toISOString(), errorCode: 'TICKET_LINK_NOT_FOUND' })
-          .where(eq(psaEvents.id, event.id));
-        return res.status(202).json({ accepted: true, ignored: true, reason: 'TICKET_LINK_NOT_FOUND' });
-      }
+      await db.transaction(async (tx) => {
+        const link = await tx.select().from(psaTicketLinks).where(and(
+          eq(psaTicketLinks.tenantId, tenantId),
+          eq(psaTicketLinks.provider, provider),
+          eq(psaTicketLinks.externalTicketId, payload.ticketId),
+        )).then(rows => rows[0]);
+        if (!link) throw new Error('TICKET_LINK_NOT_FOUND');
 
-      const finding = await db.select().from(vulnerabilityFindings).where(and(
-        eq(vulnerabilityFindings.id, link.findingId),
-        eq(vulnerabilityFindings.tenantId, tenantId),
-      )).then(rows => rows[0]);
-      if (!finding) throw new Error('FINDING_NOT_FOUND');
+        const finding = await tx.select().from(vulnerabilityFindings).where(and(
+          eq(vulnerabilityFindings.id, link.findingId),
+          eq(vulnerabilityFindings.tenantId, tenantId),
+        )).then(rows => rows[0]);
+        if (!finding) throw new Error('FINDING_NOT_FOUND');
 
-      const currentStatus = finding.status as Parameters<typeof applyPsaDisposition>[0];
-      const nextStatus = applyPsaDisposition(currentStatus, payload.status, payload.disposition);
-      if (nextStatus && nextStatus !== currentStatus) {
+        const currentStatus = finding.status as Parameters<typeof applyPsaDisposition>[0];
+        const nextStatus = applyPsaDisposition(currentStatus, payload.status, payload.disposition);
         const now = new Date().toISOString();
-        await db.update(vulnerabilityFindings).set({
-          status: nextStatus,
-          humanDisposition: payload.disposition ?? null,
-          dispositionReason: payload.reason ?? null,
-          dispositionAt: now,
-          updatedAt: now,
-        }).where(and(eq(vulnerabilityFindings.id, finding.id), eq(vulnerabilityFindings.tenantId, tenantId)));
-        await db.insert(findingDispositionHistory).values({
-          id: `finding-history-${crypto.randomUUID()}`,
-          tenantId, findingId: finding.id, fromStatus: currentStatus,
-          toStatus: nextStatus, source: 'PSA', reason: payload.reason ?? null,
-          evidenceIds: '[]', occurredAt: now,
-        });
-      }
+        if (nextStatus && nextStatus !== currentStatus) {
+          await tx.update(vulnerabilityFindings).set({
+            status: nextStatus,
+            humanDisposition: payload.disposition ?? null,
+            dispositionReason: payload.reason ?? null,
+            dispositionAt: now,
+            updatedAt: now,
+          }).where(and(eq(vulnerabilityFindings.id, finding.id), eq(vulnerabilityFindings.tenantId, tenantId)));
+          await tx.insert(findingDispositionHistory).values({
+            id: `finding-history-${crypto.randomUUID()}`,
+            tenantId, findingId: finding.id, fromStatus: currentStatus,
+            toStatus: nextStatus, source: 'PSA', reason: payload.reason ?? null,
+            evidenceIds: '[]', occurredAt: now,
+          });
+        }
 
-      await db.update(psaTicketLinks).set({
-        externalStatus: payload.status,
-        externalDisposition: payload.disposition ?? null,
-        lastExternalUpdatedAt: payload.occurredAt,
-        lastSyncedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }).where(eq(psaTicketLinks.id, link.id));
+        await tx.update(psaTicketLinks).set({
+          externalStatus: payload.status,
+          externalDisposition: payload.disposition ?? null,
+          lastExternalUpdatedAt: payload.occurredAt,
+          lastSyncedAt: now,
+          updatedAt: now,
+        }).where(eq(psaTicketLinks.id, link.id));
+      });
+
+      const finding = await db.select({ status: vulnerabilityFindings.status })
+        .from(vulnerabilityFindings)
+        .where(and(eq(vulnerabilityFindings.id, payload.findingId ?? ''), eq(vulnerabilityFindings.tenantId, tenantId)))
+        .then(rows => rows[0]);
       await db.update(psaEvents).set({ processingStatus: 'PROCESSED', processedAt: new Date().toISOString() })
         .where(eq(psaEvents.id, event.id));
-      return res.status(200).json({ accepted: true, eventKey, status: nextStatus ?? currentStatus });
-    } catch (error: any) {
+      return res.status(200).json({ accepted: true, eventKey, status: finding?.status ?? 'PROCESSED' });
+    } catch (error: unknown) {
       const code = error instanceof Error ? error.message : 'PSA_EVENT_PROCESSING_FAILED';
       await db.update(psaEvents).set({ processingStatus: 'FAILED', processedAt: new Date().toISOString(), errorCode: code.slice(0, 200) })
         .where(eq(psaEvents.id, event.id));
