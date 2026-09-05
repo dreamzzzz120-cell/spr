@@ -133,12 +133,13 @@ export function createPsaRouter() {
         payloadHash, payload: body, receivedAt,
       }).returning();
     } catch (error: unknown) {
-      // Two identical deliveries can pass the SELECT above concurrently. The
+      // Concurrent duplicate deliveries can both pass the SELECT above. The
       // database unique constraint is the authoritative idempotency boundary.
       if (!isUniqueViolation(error)) throw error;
       return res.status(200).json({ accepted: true, duplicate: true, eventKey });
     }
 
+    let resultingStatus: string | null = null;
     try {
       await db.transaction(async (tx) => {
         const link = await tx.select().from(psaTicketLinks).where(and(
@@ -156,6 +157,7 @@ export function createPsaRouter() {
 
         const currentStatus = finding.status as Parameters<typeof applyPsaDisposition>[0];
         const nextStatus = applyPsaDisposition(currentStatus, payload.status, payload.disposition);
+        resultingStatus = nextStatus ?? currentStatus;
         const now = new Date().toISOString();
         if (nextStatus && nextStatus !== currentStatus) {
           await tx.update(vulnerabilityFindings).set({
@@ -182,13 +184,9 @@ export function createPsaRouter() {
         }).where(eq(psaTicketLinks.id, link.id));
       });
 
-      const finding = await db.select({ status: vulnerabilityFindings.status })
-        .from(vulnerabilityFindings)
-        .where(and(eq(vulnerabilityFindings.id, payload.findingId ?? ''), eq(vulnerabilityFindings.tenantId, tenantId)))
-        .then(rows => rows[0]);
       await db.update(psaEvents).set({ processingStatus: 'PROCESSED', processedAt: new Date().toISOString() })
         .where(eq(psaEvents.id, event.id));
-      return res.status(200).json({ accepted: true, eventKey, status: finding?.status ?? 'PROCESSED' });
+      return res.status(200).json({ accepted: true, eventKey, status: resultingStatus });
     } catch (error: unknown) {
       const code = error instanceof Error ? error.message : 'PSA_EVENT_PROCESSING_FAILED';
       await db.update(psaEvents).set({ processingStatus: 'FAILED', processedAt: new Date().toISOString(), errorCode: code.slice(0, 200) })
