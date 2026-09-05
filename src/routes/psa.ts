@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db } from '../db/index.ts';
 import { psaEvents, psaTicketLinks, vulnerabilityFindings, findingDispositionHistory } from '../db/vex-psa-schema.ts';
 import { AuthenticatedRequest, rateLimiter, requireAuth, requireRole } from '../middleware/security.ts';
-import { applyPsaDisposition, eventIdempotencyKey, verifyPsaSignature } from '../lib/psa-sync.ts';
+import { applyPsaDisposition, derivePsaWebhookSecret, eventIdempotencyKey, verifyPsaSignature } from '../lib/psa-sync.ts';
 
 const linkSchema = z.object({
   findingId: z.string().min(1).max(200),
@@ -92,25 +92,29 @@ export function createPsaRouter() {
     res.json(rows);
   });
 
-  // Inbound PSA events are authenticated by an HMAC secret, not Firebase, because
-  // the provider is an external system. The tenant ID is part of the signed body.
+  // Inbound PSA events are authenticated by a tenant+provider-specific HMAC
+  // secret derived from a server-only root key. The root secret itself is never
+  // distributed to PSA providers. tenantId is parsed from the untrusted body
+  // solely to derive the candidate key and is trusted only after verification.
   router.post('/webhooks/:provider', rateLimiter, async (req: AuthenticatedRequest, res) => {
-    const secret = process.env.PSA_WEBHOOK_SECRET;
+    const rootSecret = process.env.PSA_WEBHOOK_SECRET;
     const signature = req.header('x-spr-signature');
     const timestamp = req.header('x-spr-timestamp');
     const body = rawBody(req);
-    if (!secret || !signature || !timestamp || body === null) {
+    const parsed = webhookSchema.safeParse(req.body);
+    if (!rootSecret || !signature || !timestamp || body === null) {
       return res.status(401).json({ error: 'WEBHOOK_AUTHENTICATION_REQUIRED' });
     }
-    if (!verifyPsaSignature(body, signature, secret, timestamp, 300)) {
-      return res.status(401).json({ error: 'WEBHOOK_SIGNATURE_INVALID' });
-    }
-
-    const parsed = webhookSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'VALIDATION_ERROR' });
+
     const payload = parsed.data;
     const provider = req.params.provider;
     const tenantId = payload.tenantId;
+    const providerSecret = derivePsaWebhookSecret(rootSecret, tenantId, provider);
+    if (!verifyPsaSignature(body, signature, providerSecret, timestamp, 300)) {
+      return res.status(401).json({ error: 'WEBHOOK_SIGNATURE_INVALID' });
+    }
+
     const receivedAt = new Date().toISOString();
     const payloadHash = crypto.createHash('sha256').update(body, 'utf8').digest('hex');
     const eventKey = eventIdempotencyKey(tenantId, provider, payload.eventId);
@@ -133,8 +137,6 @@ export function createPsaRouter() {
         payloadHash, payload: body, receivedAt,
       }).returning();
     } catch (error: unknown) {
-      // Concurrent duplicate deliveries can both pass the SELECT above. The
-      // database unique constraint is the authoritative idempotency boundary.
       if (!isUniqueViolation(error)) throw error;
       return res.status(200).json({ accepted: true, duplicate: true, eventKey });
     }
