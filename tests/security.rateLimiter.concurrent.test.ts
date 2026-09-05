@@ -29,7 +29,7 @@ function makeRateLimiterCall(store: { incr: (key: string, windowMs: number, limi
     statusCode: 200,
     headers: {},
     body: undefined,
-    setHeader(k: string, v: string) { this.headers[k] = v; },
+    setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; },
     status(c: number) { this.statusCode = c; return this; },
     json(b: unknown) { this.body = b; return this; },
   };
