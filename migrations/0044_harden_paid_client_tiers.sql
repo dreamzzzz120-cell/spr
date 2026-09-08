@@ -68,7 +68,7 @@ $$;
 
 DROP TRIGGER IF EXISTS spr_client_tier_entitlement_guard ON clients;
 CREATE TRIGGER spr_client_tier_entitlement_guard
-BEFORE INSERT OR UPDATE OF subscription_tier, tenant_id, name
+BEFORE INSERT OR UPDATE OF subscription_tier
 ON clients
 FOR EACH ROW
 EXECUTE FUNCTION spr_enforce_client_tier_entitlement();
