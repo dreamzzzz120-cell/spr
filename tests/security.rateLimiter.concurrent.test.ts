@@ -1,5 +1,3 @@
-import express from 'express';
-import request from 'supertest';
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
 import { rateLimiter, setRateLimiterStore, setRateLimiterConfig, createAtomicRateLimitClient, IORedisAtomicClient, createSharedRateLimitStoreFromEnv, RedisStore } from '../src/middleware/security';
 
@@ -16,13 +14,9 @@ class MockEvalRedisClient {
   }
 }
 
-function makeApp(store: { incr: (key: string, windowMs: number, limit: number) => Promise<any> }) {
+function makeRateLimiterCall(store: { incr: (key: string, windowMs: number, limit: number) => Promise<any> }, options: { ip?: string; tenantId?: string; headers?: Record<string, string>; path?: string } = {}) {
   setRateLimiterStore(store as any);
-  const app = express(); app.get('/ping', rateLimiter, (_req, res) => res.status(200).send('ok')); return app;
-}
-function makeRateLimiterCall(store: { incr: (key: string, windowMs: number, limit: number) => Promise<any> }, options: { ip?: string; tenantId?: string; headers?: Record<string, string> } = {}) {
-  setRateLimiterStore(store as any);
-  const req: any = { ip: options.ip, socket: { remoteAddress: options.ip }, headers: options.headers || {}, method: 'GET', url: '/ping' };
+  const req: any = { ip: options.ip, socket: { remoteAddress: options.ip }, headers: options.headers || {}, method: 'GET', path: options.path || '/ping', url: options.path || '/ping' };
   if (options.tenantId) req.user = { tenantId: options.tenantId };
   const res: any = { statusCode: 200, headers: {}, body: undefined, setHeader(k: string, v: string) { this.headers[k] = v; }, status(c: number) { this.statusCode = c; return this; }, json(b: unknown) { this.body = b; return this; }, send(b: unknown) { this.body = b; return this; } };
   let nextCalled = false; const next = () => { nextCalled = true; return Promise.resolve(); };
@@ -36,15 +30,15 @@ afterEach(() => Object.assign(process.env, originalEnv));
 describe('security.rateLimiter concurrency and failure', () => {
   it('enforces configured limit under high concurrency (mock redis)', async () => {
     const client = new MockEvalRedisClient(); const store = new RedisStore(new IORedisAtomicClient(client), client as any);
-    setRateLimiterConfig({ windowMs: 2000, maxRequests: 5 }); const app = makeApp(store);
-    const results = await Promise.all(Array.from({ length: 20 }, () => request(app).get('/ping')));
-    expect(results.filter(r => r.status === 200)).toHaveLength(5); expect(results.filter(r => r.status === 429)).toHaveLength(15); expect(client.calls).toHaveLength(20);
-    expect(Number(results.find(r => r.status === 200)!.headers['x-ratelimit-limit'])).toBe(5); expect(results.find(r => r.status === 429)!.headers['retry-after']).toBeDefined();
+    setRateLimiterConfig({ windowMs: 2000, maxRequests: 5 });
+    const results = await Promise.all(Array.from({ length: 20 }, () => makeRateLimiterCall(store, { ip: '1.2.3.4' })));
+    expect(results.filter(r => r.res.statusCode === 200)).toHaveLength(5); expect(results.filter(r => r.res.statusCode === 429)).toHaveLength(15); expect(client.calls).toHaveLength(20);
+    expect(Number(results.find(r => r.res.statusCode === 200)!.res.headers['X-RateLimit-Limit'])).toBe(5); expect(results.find(r => r.res.statusCode === 429)!.res.headers['Retry-After']).toBeDefined();
   });
-  it('returns 503 when shared store errors', async () => { expect((await request(makeApp({ incr: async () => { throw new Error('redis down'); } })).get('/ping')).status).toBe(503); });
-  it('invalid shared store count returns 503', async () => { expect((await request(makeApp({ incr: async () => ({ count: NaN, resetAt: Date.now() + 1000 }) })).get('/ping')).status).toBe(503); });
-  it('invalid shared store resetAt returns 503', async () => { expect((await request(makeApp({ incr: async () => ({ count: 1, resetAt: NaN }) })).get('/ping')).status).toBe(503); });
-  it('creates a fresh window after expiry', async () => { const c = new MockEvalRedisClient(); const s = new RedisStore(new IORedisAtomicClient(c), c as any); setRateLimiterConfig({ windowMs: 100, maxRequests: 1 }); const app = makeApp(s); expect((await request(app).get('/ping')).status).toBe(200); expect((await request(app).get('/ping')).status).toBe(429); await new Promise(r => setTimeout(r, 120)); expect((await request(app).get('/ping')).status).toBe(200); });
+  it('returns 503 when shared store errors', async () => { expect((await makeRateLimiterCall({ incr: async () => { throw new Error('redis down'); } })).res.statusCode).toBe(503); });
+  it('invalid shared store count returns 503', async () => { expect((await makeRateLimiterCall({ incr: async () => ({ count: NaN, resetAt: Date.now() + 1000 }) })).res.statusCode).toBe(503); });
+  it('invalid shared store resetAt returns 503', async () => { expect((await makeRateLimiterCall({ incr: async () => ({ count: 1, resetAt: NaN }) })).res.statusCode).toBe(503); });
+  it('creates a fresh window after expiry', async () => { const c = new MockEvalRedisClient(); const s = new RedisStore(new IORedisAtomicClient(c), c as any); setRateLimiterConfig({ windowMs: 100, maxRequests: 1 }); expect((await makeRateLimiterCall(s, { ip: '1.2.3.4' })).res.statusCode).toBe(200); expect((await makeRateLimiterCall(s, { ip: '1.2.3.4' })).res.statusCode).toBe(429); await new Promise(r => setTimeout(r, 120)); expect((await makeRateLimiterCall(s, { ip: '1.2.3.4' })).res.statusCode).toBe(200); });
   it('shares one limit for the same tenant and ip', async () => { const c = new MockEvalRedisClient(); const s = new RedisStore(new IORedisAtomicClient(c), c as any); setRateLimiterConfig({ windowMs: 2000, maxRequests: 1 }); const a = await makeRateLimiterCall(s, { ip: '1.2.3.4', tenantId: 'tenant-a' }); const b = await makeRateLimiterCall(s, { ip: '1.2.3.4', tenantId: 'tenant-a' }); expect(a.res.statusCode).toBe(200); expect(b.res.statusCode).toBe(429); });
   it('uses separate keys for different tenants', async () => { const c = new MockEvalRedisClient(); const s = new RedisStore(new IORedisAtomicClient(c), c as any); setRateLimiterConfig({ windowMs: 2000, maxRequests: 1 }); const a = await makeRateLimiterCall(s, { ip: '1.2.3.4', tenantId: 'tenant-a' }); const b = await makeRateLimiterCall(s, { ip: '1.2.3.4', tenantId: 'tenant-b' }); expect(a.res.statusCode).toBe(200); expect(b.res.statusCode).toBe(200); });
   it('does not trust tenant headers', async () => { const c = new MockEvalRedisClient(); const s = new RedisStore(new IORedisAtomicClient(c), c as any); setRateLimiterConfig({ windowMs: 2000, maxRequests: 1 }); const a = await makeRateLimiterCall(s, { ip: '1.2.3.4', headers: { 'x-tenant-id': 'tenant-a' } }); const b = await makeRateLimiterCall(s, { ip: '1.2.3.4', headers: { 'x-tenant-id': 'tenant-b' } }); expect(a.res.statusCode).toBe(200); expect(b.res.statusCode).toBe(429); });

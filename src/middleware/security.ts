@@ -79,7 +79,7 @@ export function setRateLimiterStore(s: RateLimitStore) {
 }
 
 function rateLimitPolicy(req: Request): { limit: number; bucket: string } {
-  const path = req.path.toLowerCase();
+  const path = String(req.path || req.url || '').toLowerCase();
   if (path.includes('/scan') || path.includes('/pipeline')) return { limit: 20, bucket: 'expensive-scan' };
   if (path.includes('/ai') || path.includes('/agent')) return { limit: 30, bucket: 'ai' };
   if (path.includes('/auth/')) return { limit: 30, bucket: 'auth' };
@@ -117,7 +117,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
   if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7).trim();
   if (!token) return res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization token' });
   try {
-    const decodedToken: any = await adminAuth.verifyIdToken(token, true);
+    const decodedToken: any = await adminAuth.verifyIdToken(token, true); // Invalid verification falls through to the fail-closed catch below.
     const uid = decodedToken.uid; const email = decodedToken.email || `${uid}@user.local`; const emailVerified = !!decodedToken.email_verified;
     const exempt = req.path === '/api/user/me' || req.path === '/api/auth/resend-verification' || req.path === '/api/auth/verify-status';
     if (!emailVerified && !exempt) return res.status(403).json({ error: 'Email verification required', code: 'EMAIL_NOT_VERIFIED', message: 'Your email address must be verified before accessing workspace resources.' });

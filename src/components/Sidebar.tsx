@@ -1,7 +1,7 @@
 /** SPR navigation: organize the product around four jobs — Know, Prove, Watch, Use. */
 import React, { useMemo, useState } from 'react';
 import SPRLogo from './SPRLogo';
-import { Activity, Bell, Boxes, Building2, ChevronDown, FileBarChart2, FileCheck, Globe2, LayoutDashboard, Network, PlugZap, Search, Settings, Shield, Sparkles, Workflow, Radar } from 'lucide-react';
+import { Activity, Bell, Boxes, Building2, ChevronDown, FileBarChart2, FileCheck, Globe2, LayoutDashboard, Network, PlugZap, Search, Settings, Shield, Sparkles, Workflow, Radar, Handshake } from 'lucide-react';
 import { Client } from '../types';
 interface Props { clients: Client[]; selectedClientId: string; setSelectedClientId: (id: string) => void; activeTab: string; setActiveTab: (tab: string) => void; alertCount: number; installedExtensions: string[]; userRole: string; }
 type NavItem = { id: string; label: string; icon: any; badge?: string };
@@ -17,7 +17,7 @@ const capabilityMap: Record<string, NavItem[]> = {
   'fin-license': [{ id: 'billing', label: 'Billing', icon: Boxes }],
   'exec-board': [{ id: 'reports', label: 'Reports', icon: FileBarChart2 }]
 };
-export default function Sidebar({ clients, selectedClientId, setSelectedClientId, activeTab, setActiveTab, alertCount, installedExtensions, userRole }: Props) {
+export default function Sidebar({ clients, selectedClientId, setSelectedClientId, alertCount, installedExtensions, userRole, activeTab, setActiveTab }: Props) {
   const [open, setOpen] = useState(false); const selected = clients.find(c => c.id === selectedClientId);
   const spaces = useMemo(() => { const seen = new Set<string>(); return installedExtensions.flatMap(id => capabilityMap[id] || []).filter(item => { if (seen.has(item.id)) return false; seen.add(item.id); return true; }); }, [installedExtensions]);
   const go = (id: string) => setActiveTab(id);
@@ -45,9 +45,10 @@ export default function Sidebar({ clients, selectedClientId, setSelectedClientId
         <NavItemButton item={{ id: 'compliance', label: 'Compliance Evidence', icon: FileCheck }} active={activeTab === 'compliance'} onClick={go} />
         <NavItemButton item={{ id: 'ai-swarm', label: 'Continuous Verification', icon: Activity }} active={activeTab === 'ai-swarm'} onClick={go} />
       </NavSection>
-      <NavSection title="04 · USE" subtitle="Build on SPR" active={isAny(['integrations','ai-agent-trust','settings'])}>
+      <NavSection title="04 · USE" subtitle="Build on SPR" active={isAny(['integrations','ai-agent-trust','settings','partner-program'])}>
         <NavItemButton item={{ id: 'integrations', label: 'SPR Connections', icon: Workflow }} active={activeTab === 'integrations'} onClick={go} />
         <NavItemButton item={{ id: 'ai-agent-trust', label: 'Ask SPR', icon: Search }} active={activeTab === 'ai-agent-trust'} onClick={go} />
+        <NavItemButton item={{ id: 'partner-program', label: 'Partner Program', icon: Handshake }} active={activeTab === 'partner-program'} onClick={go} />
         <NavItemButton item={{ id: 'settings', label: 'Administration', icon: Settings }} active={activeTab === 'settings'} onClick={go} />
       </NavSection>
       {spaces.length > 0 && <NavSection title="ACTIVE CAPABILITIES" subtitle="Enabled in this workspace">{spaces.map(item => <NavItemButton key={item.id} item={{ ...item, badge: item.id === 'alerts' && alertCount ? String(alertCount) : item.badge }} active={activeTab === item.id} onClick={go} />)}</NavSection>}
