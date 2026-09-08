@@ -1,3 +1,5 @@
+BEGIN;
+
 -- SPR entitlement hardening: client subscription tiers are not a client-controlled
 -- authorization primitive. Paid tiers may only exist when backed by a Paid billing
 -- record for the same tenant/client, or when the tenant belongs to the founder.
@@ -72,3 +74,5 @@ BEFORE INSERT OR UPDATE OF subscription_tier
 ON clients
 FOR EACH ROW
 EXECUTE FUNCTION spr_enforce_client_tier_entitlement();
+
+COMMIT;
