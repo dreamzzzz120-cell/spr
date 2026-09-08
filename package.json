@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:security": "vitest run tests/security-rbac.test.ts",
     "route:attack": "node scripts/route-attack-test.mjs",
-    "security:gate": "node scripts/security-hardening-check.mjs && node scripts/migration-hardening-check.mjs && node scripts/route-security-gate.mjs && node scripts/agent-trust-security-gate.mjs",
+    "security:gate": "node scripts/security-hardening-check.mjs && node scripts/migration-hardening-check.mjs && node scripts/route-security-gate.mjs && node scripts/agent-trust-security-gate.mjs && node scripts/report-hardening-gate.mjs",
+    "report:gate": "node scripts/report-hardening-gate.mjs",
     "zip:full": "node scripts/make-full-zip.js"
   },
   "dependencies": {
@@ -25,7 +26,7 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
     "cors": "^2.8.6",
-    "d3": "^7.9.0",
+    "d3": "^7.9.2",
     "dompurify": "^3.4.12",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.2",
@@ -44,10 +45,7 @@
     "react-dom": "^19.0.1",
     "recharts": "^3.9.2",
     "stripe": "^22.3.1",
-    "zod": "^3.24.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.1.14",
+    "zod": "^3.24.1",
     "@types/cors": "^2.8.19",
     "@types/d3": "^7.4.3",
     "@types/dompurify": "^3.0.5",
@@ -61,8 +59,6 @@
     "@vitejs/plugin-react": "^5.0.4",
     "archiver": "^5.3.1",
     "autoprefixer": "^10.4.21",
-    "cross-env": "^7.0.3",
-    "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
@@ -71,12 +67,8 @@
   "overrides": {
     "brace-expansion": "5.0.9",
     "minimatch": "10.2.5",
-    "@esbuild-kit/core-utils": {
-      "esbuild": "0.28.1"
-    },
-    "@esbuild-kit/esm-loader": {
-      "esbuild": "0.28.1"
-    },
+    "@esbuild-kit/core-utils": { "esbuild": "0.28.1" },
+    "@esbuild-kit/esm-loader": { "esbuild": "0.28.1" },
     "uuid": "11.1.1",
     "retry-request": "8.0.4",
     "teeny-request": "10.1.4",
