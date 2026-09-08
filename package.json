@@ -62,6 +62,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "archiver": "^5.3.1",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
@@ -75,7 +76,6 @@
     "@esbuild-kit/esm-loader": { "esbuild": "0.28.1" },
     "uuid": "11.1.1",
     "retry-request": "8.0.4",
-    "teeny-request": "10.1.4",
     "gaxios": "7.3.0"
   }
 }
