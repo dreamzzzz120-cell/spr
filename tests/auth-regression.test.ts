@@ -29,14 +29,10 @@ describe('auth regression guard — src/middleware/security.ts', () => {
     expect(securitySource).not.toContain('adminAuth.verifyIdToken(token);');
   });
 
-  it('requireAuth returns 401 in the same catch block where verifyIdToken() fails (fails closed)', () => {
-    const verifyIdx = securitySource.indexOf('verifyIdToken(');
-    expect(verifyIdx).toBeGreaterThan(-1);
-    const afterVerify = securitySource.slice(verifyIdx, verifyIdx + 1400);
-    const catchIdx = afterVerify.indexOf('} catch');
-    expect(catchIdx).toBeGreaterThan(-1);
-    const catchBlock = afterVerify.slice(catchIdx, catchIdx + 500);
-    expect(catchBlock).toMatch(/res\.status\(401\)/);
+  it('requireAuth returns 401 when verifyIdToken() fails (fails closed)', () => {
+    expect(securitySource).toMatch(
+      /adminAuth\.verifyIdToken\(token, true\)[\s\S]{0,3000}\}\s*catch\s*\([^)]*\)[\s\S]{0,700}res\.status\(401\)/,
+    );
   });
 
   it('does not import a firebaseConfig client-side config into the server auth middleware', () => {
