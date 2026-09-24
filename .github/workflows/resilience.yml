@@ -1,0 +1,81 @@
+name: Resilience
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 4 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: resilience-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    name: Resilience Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: spr_resilience
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d spr_resilience"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify dependency lockfile
+        run: git diff --exit-code -- package-lock.json
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Full tests
+        run: npm test -- --run
+
+      - name: Security tests
+        run: npm run test:security
+
+      - name: Security gates
+        run: npm run security:gate
+
+      - name: Migration apply + idempotency
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/spr_resilience
+        run: |
+          set -euo pipefail
+          npx tsx scripts/migrate.ts
+          FIRST="$(psql "$DATABASE_URL" -Atc 'SELECT count(*) FROM schema_migrations')"
+          npx tsx scripts/migrate.ts
+          SECOND="$(psql "$DATABASE_URL" -Atc 'SELECT count(*) FROM schema_migrations')"
+          test "$FIRST" = "$SECOND"
+          test "$FIRST" -gt 0
+
+      - name: Production build
+        run: npm run build
+
+      - name: Container build
+        run: docker build --pull --no-cache --tag spr:resilience .

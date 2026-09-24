@@ -5,8 +5,11 @@
 
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import * as schema from './schema.ts';
+import * as baseSchema from './schema.ts';
+import * as vexPsaSchema from './vex-psa-schema.ts';
 import { config } from '../config.ts';
+
+const schema = { ...baseSchema, ...vexPsaSchema };
 
 const getNumericEnv = (value: string | undefined, fallback: number) => {
   if (!value) return fallback;
@@ -26,7 +29,6 @@ export const databaseConfigurationSummary = {
   queryTimeoutMillis: getNumericEnv(config.database.queryTimeoutMs?.toString(), 5000),
 };
 
-// Function to create a new connection pool with Object configuration
 export const createPool = () => {
   if (!isDatabaseConfigured) {
     console.warn('[Database] SQL configuration is incomplete. DB readiness will report DB_MISCONFIGURED until DATABASE_URL or SQL_HOST, SQL_USER, SQL_PASSWORD and SQL_DB_NAME are configured.');
@@ -40,10 +42,7 @@ export const createPool = () => {
   };
 
   if (config.database.connectionString) {
-    return new Pool({
-      connectionString: config.database.connectionString,
-      ...poolConfig,
-    });
+    return new Pool({ connectionString: config.database.connectionString, ...poolConfig });
   }
 
   return new Pool({
@@ -56,25 +55,11 @@ export const createPool = () => {
   });
 };
 
-// Create a pool instance
 const pool = createPool();
+pool.on('error', (err) => console.error('[Database] Unexpected error on idle SQL pool client:', err?.message || err));
+pool.on('connect', () => console.info('[Database] PostgreSQL pool client connected'));
+pool.on('acquire', () => console.info('[Database] PostgreSQL pool client acquired'));
+pool.on('remove', () => console.info('[Database] PostgreSQL pool client removed'));
 
-// Prevent unhandled pool-level errors from crashing the application
-pool.on('error', (err) => {
-  console.error('[Database] Unexpected error on idle SQL pool client:', err?.message || err);
-});
-
-pool.on('connect', () => {
-  console.info('[Database] PostgreSQL pool client connected');
-});
-
-pool.on('acquire', () => {
-  console.info('[Database] PostgreSQL pool client acquired');
-});
-
-pool.on('remove', () => {
-  console.info('[Database] PostgreSQL pool client removed');
-});
-
-// Initialize Drizzle with the pool and schema
+export { schema };
 export const db = drizzle(pool, { schema });

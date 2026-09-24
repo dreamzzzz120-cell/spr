@@ -1,7 +1,7 @@
 /** SPR navigation: organize the product around four jobs — Know, Prove, Watch, Use. */
 import React, { useMemo, useState } from 'react';
 import SPRLogo from './SPRLogo';
-import { Activity, Bell, Boxes, Building2, ChevronDown, FileBarChart2, FileCheck, Globe2, LayoutDashboard, Network, PlugZap, Search, Settings, Shield, Sparkles, Workflow, Radar } from 'lucide-react';
+import { Activity, Bell, Boxes, Building2, ChevronDown, FileBarChart2, FileCheck, Globe2, LayoutDashboard, Network, PlugZap, Search, Settings, Shield, Sparkles, Workflow, Radar, Handshake, Crown } from 'lucide-react';
 import { Client } from '../types';
 interface Props { clients: Client[]; selectedClientId: string; setSelectedClientId: (id: string) => void; activeTab: string; setActiveTab: (tab: string) => void; alertCount: number; installedExtensions: string[]; userRole: string; }
 type NavItem = { id: string; label: string; icon: any; badge?: string };
@@ -27,17 +27,19 @@ export default function Sidebar({ clients, selectedClientId, setSelectedClientId
     <div className="px-4 py-3 border-b border-slate-800/60 bg-[#0d1322]/50 relative"><span className="text-[8px] font-mono font-bold text-slate-500 uppercase tracking-widest block mb-1.5">WORKSPACE</span><button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#141c2e] hover:bg-[#1e293b] text-slate-100 border border-slate-700/60 text-left text-xs"><div className="flex items-center gap-2 min-w-0"><Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" /><span className="font-semibold truncate">{selectedClientId === 'global' ? 'Organization' : selected?.name || 'Organization'}</span></div><ChevronDown className="w-3.5 h-3.5 text-slate-400" /></button>{open && <div className="absolute left-4 right-4 top-[66px] bg-[#0d1322] border border-slate-700 rounded-xl shadow-2xl z-50 py-1 max-h-64 overflow-y-auto"><button onClick={() => { setSelectedClientId('global'); setOpen(false); }} className="w-full px-3 py-2.5 text-xs text-left hover:bg-slate-800">Organization / all software</button>{clients.map(c => <button key={c.id} onClick={() => { setSelectedClientId(c.id); setOpen(false); }} className="w-full px-3 py-2.5 text-xs text-left hover:bg-slate-800 flex justify-between"><span>{c.name}</span>{c.criticalRisksCount > 0 && <span className="text-rose-400 font-mono">{c.criticalRisksCount}</span>}</button>)}</div>}</div>
     <div className="px-4 pt-4 pb-2"><button onClick={() => go('dashboard')} className={`w-full rounded-2xl border px-3 py-3 text-left transition ${activeTab === 'dashboard' ? 'border-indigo-400/40 bg-indigo-500/15' : 'border-slate-800 bg-[#0d1322] hover:bg-[#141c2e]'}`}><div className="flex items-center gap-2.5"><LayoutDashboard className="w-4 h-4 text-indigo-300" /><div><div className="text-xs font-bold text-white">Home</div><div className="text-[9px] text-slate-500">Your software trust command center</div></div></div></button></div>
     <div className="flex-1 overflow-y-auto px-3 py-2 space-y-5 sidebar-scrollbar">
+      {userRole === 'Owner' && <NavSection title="FOUNDER" subtitle="Executive control center" active={activeTab === 'founder'}><NavItemButton item={{ id: 'founder', label: 'Founder Command Center', icon: Crown }} active={activeTab === 'founder'} onClick={go} /></NavSection>}
       <NavSection title="01 · KNOW" subtitle="Discover & investigate" active={isAny(['passports','vendors','security','assets'])}>
         <NavItemButton item={{ id: 'passports', label: 'Investigate Software', icon: Search }} active={activeTab === 'passports'} onClick={go} />
         <NavItemButton item={{ id: 'vendors', label: 'Vendors & Products', icon: Globe2 }} active={activeTab === 'vendors'} onClick={go} />
         <NavItemButton item={{ id: 'security', label: 'Security Evidence', icon: Shield }} active={activeTab === 'security'} onClick={go} />
         <NavItemButton item={{ id: 'assets', label: 'Software Inventory', icon: Boxes }} active={activeTab === 'assets'} onClick={go} />
       </NavSection>
-      <NavSection title="02 · PROVE" subtitle="Create & verify" active={isAny(['passports','integrations','reports','marketplace'])}>
+      <NavSection title="02 · PROVE" subtitle="Create & verify" active={isAny(['passports','integrations','reports','marketplace','partner-program'])}>
         <NavItemButton item={{ id: 'passports', label: 'Software Passports', icon: FileCheck }} active={activeTab === 'passports'} onClick={go} />
         <NavItemButton item={{ id: 'integrations', label: 'Connect Evidence', icon: PlugZap }} active={activeTab === 'integrations'} onClick={go} />
         <NavItemButton item={{ id: 'reports', label: 'Verification Reports', icon: FileBarChart2 }} active={activeTab === 'reports'} onClick={go} />
         <NavItemButton item={{ id: 'marketplace', label: 'Add Sources', icon: Sparkles }} active={activeTab === 'marketplace'} onClick={go} />
+        <NavItemButton item={{ id: 'partner-program', label: 'MSP Partner Program', icon: Handshake }} active={activeTab === 'partner-program'} onClick={go} />
       </NavSection>
       <NavSection title="03 · WATCH" subtitle="Continuous trust" active={isAny(['scans','alerts','compliance','ai-swarm'])}>
         <NavItemButton item={{ id: 'scans', label: 'Monitor Changes', icon: Radar }} active={activeTab === 'scans'} onClick={go} />

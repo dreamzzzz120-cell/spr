@@ -15,8 +15,8 @@ if (!/RATE_LIMIT_STORE_UNAVAILABLE/.test(securitySource)) failures.push('Missing
 if (!/if \(config\.isProduction\) sharedStore = createSharedRateLimitStoreFromEnv\(\);/.test(securitySource)) failures.push('Production shared rate-limit store is not initialized explicitly.');
 
 for (const [name, source] of [['Dockerfile', dockerSource], ['Dockerfile.worker', workerDockerSource]]) {
-  if (/FROM\s+node:20(?:[-@\s]|$)/m.test(source)) failures.push(`${name} still uses Node 20; production baseline is Node 22.`);
-  if (!/FROM\s+node:22(?:[-@\s]|$)/m.test(source)) failures.push(`${name} is missing an explicit Node 22 base image.`);
+  if (/FROM\s+node:20(?:\.[0-9]+)*(?:[-@\s]|$)/m.test(source)) failures.push(`${name} still uses Node 20; production baseline is Node 22.`);
+  if (!/FROM\s+node:22(?:\.[0-9]+)*(?:[-@\s]|$)/m.test(source)) failures.push(`${name} is missing an explicit Node 22 base image.`);
   if (!/USER\s+node\b/.test(source)) failures.push(`${name} does not drop to the non-root node user.`);
   if (/raw\.githubusercontent\.com\/anchore\/syft\/main\/install\.sh/.test(source)) failures.push(`${name} installs Syft from the mutable main branch.`);
   if (!/raw\.githubusercontent\.com\/anchore\/syft\/v1\.49\.0\/install\.sh/.test(source)) failures.push(`${name} is missing the pinned Syft installer revision.`);

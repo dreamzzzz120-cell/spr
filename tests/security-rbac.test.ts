@@ -22,6 +22,10 @@ function responseDouble() {
 function requestDouble(role?: string) {
   return {
     ip: '203.0.113.10',
+    path: '/api/ping',
+    method: 'GET',
+    url: '/api/ping',
+    headers: {},
     socket: { remoteAddress: '203.0.113.10' },
     user: role ? { id: 1, uid: 'uid-test', email: 'test@example.invalid', tenantId: 'tenant-a', role, emailVerified: true } : undefined,
   } as any;
@@ -40,7 +44,6 @@ describe('security middleware attack regressions', () => {
       requireRole(['Owner'])(requestDouble(role), res, next);
       expect(res.statusCode).toBe(403);
     }
-
     const res = responseDouble();
     let called = false;
     requireRole(['Owner'])(requestDouble('Owner'), res, () => { called = true; });
@@ -56,9 +59,7 @@ describe('security middleware attack regressions', () => {
   });
 
   it('fails closed when the shared rate-limit store is unavailable', async () => {
-    setRateLimiterStore({
-      async incr() { throw new Error('redis unavailable'); },
-    });
+    setRateLimiterStore({ async incr() { throw new Error('redis unavailable'); } });
     const res = responseDouble();
     await rateLimiter(requestDouble(), res, () => { throw new Error('must not call next'); });
     expect(res.statusCode).toBe(503);
@@ -75,13 +76,11 @@ describe('security middleware attack regressions', () => {
         return { count, resetAt: Date.now() + windowMs };
       },
     });
-
     const first = responseDouble();
     let firstNext = false;
     await rateLimiter(requestDouble(), first, () => { firstNext = true; });
     expect(firstNext).toBe(true);
     expect(first.statusCode).toBe(200);
-
     const second = responseDouble();
     let secondNext = false;
     await rateLimiter(requestDouble(), second, () => { secondNext = true; });
