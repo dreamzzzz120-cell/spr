@@ -17,7 +17,9 @@
     "test:security": "vitest run tests/security-rbac.test.ts",
     "route:attack": "node scripts/route-attack-test.mjs",
     "security:gate": "node scripts/security-hardening-check.mjs && node scripts/migration-hardening-check.mjs && node scripts/route-security-gate.mjs && node scripts/agent-trust-security-gate.mjs",
-    "zip:full": "node scripts/make-full-zip.js"
+    "zip:full": "node scripts/make-full-zip.js",
+    "test:adversarial": "vitest run tests/auth-regression.test.ts tests/security-rbac.test.ts tests/rbac-escalation-regression.test.ts tests/tenant-isolation-adversarial.test.ts",
+    "tenant:attack": "vitest run tests/tenant-isolation-adversarial.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
