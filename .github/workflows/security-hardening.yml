@@ -76,11 +76,17 @@ jobs:
         run: npm run build
       - name: Tests
         run: npm test -- --run
+      - name: Adversarial auth RBAC and tenant isolation
+        if: always()
+        run: npm run test:adversarial
       - name: Security attack regressions
+        if: always()
         run: npm run test:security
       - name: Live unauthenticated route attack test
+        if: always()
         run: npm run route:attack
       - name: Migration and route security gates
+        if: always()
         run: npm run security:gate
       - name: Full dependency audit
         run: npm audit --audit-level=high
