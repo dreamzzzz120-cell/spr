@@ -41,6 +41,7 @@ import OnboardingWizard from './components/OnboardingWizard';
 import ExtensionMarketplace from './components/ExtensionMarketplace';
 import TrustOSTutorial from './components/TrustOSTutorial';
 import FounderDashboardView from './components/FounderDashboardView';
+import EvidenceExchangeView from './components/EvidenceExchangeView';
 
 // Modals Icons
 import { CheckCircle2, X, ShieldAlert, Sparkles, Plus, Layers, HelpCircle, RefreshCw } from 'lucide-react';
@@ -560,6 +561,7 @@ export default function App() {
           ) : <PaywallOverlay featureName="Passport Scanner Pipeline" featureDescription="Run configured server-side checks and review their recorded findings. Continuous monitoring and signing require connected providers." requiredTier="Premium" currentClientId={selectedClientId} clients={clients} onUpgradeSuccess={handleUpgradeSuccess} />)}
 
           {activeTab === 'vendors' && <VendorsView vendors={vendors} searchQuery={searchQuery} />}
+          {activeTab === 'evidence-exchange' && <EvidenceExchangeView clients={clients} passports={passports} vendors={vendors} onNavigate={handleNavigateWithItem} />}
           {activeTab === 'security' && <SecurityCenterView clients={clients} passports={passports} />}
           {activeTab === 'compliance' && <ComplianceView clients={clients} />}
 
