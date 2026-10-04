@@ -115,6 +115,8 @@ export default function EvidenceExchangeView({ clients, passports, vendors, onNa
           </div>
         </div>
 
+        <DecisionTrace passport={selected!} />
+
         <LensPanel lens={lens} passport={selected!} state={state!} onNavigate={onNavigate} />
 
         <div className="grid md:grid-cols-3 gap-4">
@@ -153,4 +155,96 @@ function EvidenceFact({ label, value, known }: { label: string; value: string; k
 }
 function ActionCard({ icon: Icon, title, text, action, onClick }: { icon: any; title: string; text: string; action: string; onClick: () => void }) {
   return <div className="rounded-2xl border border-slate-800 bg-[#0b1020] p-4"><Icon className="w-5 h-5 text-indigo-300" /><h3 className="mt-3 text-sm font-bold text-white">{title}</h3><p className="mt-1 text-[11px] leading-5 text-slate-500">{text}</p><button onClick={onClick} className="mt-4 text-[10px] font-bold text-indigo-300 hover:text-indigo-200">{action} →</button></div>;
+}
+
+function DecisionTrace({ passport }: { passport: SoftwarePassport }) {
+  const evidence = Array.isArray(passport.evidence) ? passport.evidence : [];
+  const missing: { label: string; where: string; request: string }[] = [];
+  if (!passport.fileHash) missing.push({
+    label: 'Authoritative artifact hash',
+    where: 'Vendor release/download portal, signed release manifest, package registry, or a hash computed from the exact installed artifact.',
+    request: `Provide the SHA-256 release hash for ${passport.name} version ${passport.version}, preferably in a signed or authenticated release record.`
+  });
+  if (!passport.sbom?.length) missing.push({
+    label: 'Software Bill of Materials',
+    where: 'Vendor security portal, engineering team, release artifacts, CycloneDX/SPDX export, package lockfiles, or a reproducible SBOM generated from the exact artifact.',
+    request: `Provide a version-specific CycloneDX or SPDX SBOM for ${passport.name} ${passport.version}.`
+  });
+  const hasSignature = evidence.some(e => e.type === 'Signature');
+  if (!hasSignature) missing.push({
+    label: 'Code-signing / provenance evidence',
+    where: 'Executable signature, vendor signing certificate, notarization record, signed release manifest, build attestation, or authenticated repository release.',
+    request: `Provide cryptographic signing or build provenance evidence for ${passport.name} ${passport.version} that can be matched to the assessed artifact.`
+  });
+
+  return <div className="rounded-2xl border border-slate-800 bg-[#0b1020] p-5">
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <div className="text-[9px] uppercase tracking-widest font-mono text-indigo-300">Decision trace</div>
+        <h3 className="mt-1 text-sm font-bold text-white">Show your work</h3>
+        <p className="mt-1 text-xs text-slate-500">SPR separates recorded source evidence from interpretation and keeps missing answers explicit.</p>
+      </div>
+      <span className="rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1 text-[9px] font-mono text-slate-400">NO INVENTED EVIDENCE</span>
+    </div>
+
+    <div className="mt-5 grid lg:grid-cols-2 gap-4">
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+        <div className="text-[10px] font-bold text-slate-300">1 · WHAT SPR ACTUALLY HAS</div>
+        <div className="mt-3 space-y-2">
+          <TraceRow label="Software identity" value={`${passport.name} ${passport.version}`} />
+          <TraceRow label="Publisher record" value={passport.publisher || 'UNKNOWN'} />
+          <TraceRow label="Artifact hash" value={passport.fileHash || 'UNKNOWN'} mono />
+          <TraceRow label="SBOM components" value={String(passport.sbom?.length || 0)} />
+          <TraceRow label="Evidence records" value={String(evidence.length)} />
+          <TraceRow label="Timeline events" value={String(passport.timeline?.length || 0)} />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+        <div className="text-[10px] font-bold text-slate-300">2 · SOURCE EVIDENCE</div>
+        <div className="mt-3 space-y-2 max-h-56 overflow-y-auto">
+          {evidence.length ? evidence.map(item => <div key={item.id} className="rounded-lg border border-slate-800 bg-[#0b1020] p-3">
+            <div className="flex items-center justify-between gap-2"><span className="text-[11px] font-bold text-white">{item.name}</span><span className="text-[9px] font-mono text-indigo-300">{item.status}</span></div>
+            <div className="mt-1 text-[10px] text-slate-500">{item.type} · {item.timestamp || 'timestamp unknown'}</div>
+            <div className="mt-2 grid grid-cols-1 gap-1 text-[10px]">
+              <TraceRow label="Signer/source" value={item.signer || 'UNKNOWN'} />
+              <TraceRow label="Hash" value={item.hash || item.checksum || 'UNKNOWN'} mono />
+              <TraceRow label="Verifier" value={item.verifierEngineId || 'UNKNOWN'} />
+            </div>
+          </div>) : <div className="rounded-lg border border-dashed border-slate-700 p-4 text-xs text-slate-500">No evidence records are persisted for this passport. SPR therefore does not claim a verified evidence state.</div>}
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-4 grid lg:grid-cols-2 gap-4">
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+        <div className="text-[10px] font-bold text-slate-300">3 · HOW SPR GOT THE ANSWER</div>
+        <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+          <p>SPR checks the exact software record for persisted evidence, an artifact hash, and an SBOM. It does not convert a missing field into a security failure.</p>
+          <p>If evidence exists, SPR shows its recorded status and source metadata. If it is absent, the corresponding property remains <span className="text-slate-200 font-bold">UNKNOWN</span> or <span className="text-amber-300 font-bold">PARTIAL</span>.</p>
+          <p>This screen does not use an AI-generated substitute for missing proof.</p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+        <div className="text-[10px] font-bold text-slate-300">4 · WHERE TO GET THE MISSING ANSWER</div>
+        <div className="mt-3 space-y-3">
+          {missing.length ? missing.map(item => <div key={item.label} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+            <div className="text-[11px] font-bold text-amber-200">{item.label}</div>
+            <div className="mt-1 text-[10px] leading-4 text-slate-400"><span className="text-slate-300 font-bold">Look here:</span> {item.where}</div>
+            <div className="mt-2 text-[10px] leading-4 text-slate-400"><span className="text-slate-300 font-bold">Ask for:</span> {item.request}</div>
+          </div>) : <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-200">Core evidence categories shown here are present. Individual evidence items still retain their own verification state and must not be treated as equivalent.</div>}
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+      <div className="text-[10px] font-bold text-slate-300">5 · WHAT WOULD CHANGE THE ANSWER</div>
+      <p className="mt-2 text-xs leading-5 text-slate-400">The state changes only when new evidence is persisted and validated for this exact product/version. A vendor statement alone is supporting evidence; it must not silently overwrite contradictory direct observation or a failed verification result.</p>
+    </div>
+  </div>;
+}
+
+function TraceRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return <div className="flex items-start justify-between gap-3 text-[10px]"><span className="text-slate-500">{label}</span><span className={`text-right text-slate-300 break-all ${mono ? 'font-mono' : ''}`}>{value}</span></div>;
 }
